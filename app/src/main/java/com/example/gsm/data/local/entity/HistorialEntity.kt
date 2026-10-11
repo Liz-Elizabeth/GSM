@@ -1,4 +1,3 @@
-
 package com.example.gsm.data.local.entity
 
 import androidx.room.Entity
@@ -12,17 +11,20 @@ import androidx.room.PrimaryKey
         ForeignKey(
             entity = SolicitudEntity::class,
             parentColumns = ["id"],
-            childColumns = ["solicitudId"]
+            childColumns = ["solicitudId"],
+            onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = UsuarioEntity::class,
             parentColumns = ["id"],
-            childColumns = ["usuarioId"]
+            childColumns = ["usuarioId"],
+            onDelete = ForeignKey.RESTRICT
         )
     ],
     indices = [
         Index(value = ["solicitudId"]),
-        Index(value = ["usuarioId"])
+        Index(value = ["usuarioId"]),
+        Index(value = ["fechaCambio"])
     ]
 )
 data class HistorialEntity(
@@ -32,6 +34,10 @@ data class HistorialEntity(
     val usuarioId: Int,
     val estadoAnterior: String?,
     val estadoNuevo: String,
+    val accion: String, // "CREACION", "ASIGNACION", "AVANCE", "RESOLUCION", "CIERRE", "REAPERTURA"
     val comentario: String,
-    val fechaCambio: Long
+    val perfilUsuario: String, // "CLIENTE", "ADMINISTRADOR", "TECNICO"
+    val esComentarioInterno: Boolean = false, // True si es solo visible para Admin/Técnico
+    val evidenciaAdjunta: String? = null,
+    val fechaCambio: Long = System.currentTimeMillis()
 )
