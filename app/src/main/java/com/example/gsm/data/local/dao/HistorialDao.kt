@@ -16,18 +16,22 @@ interface HistorialDao {
     @Query("SELECT * FROM historial WHERE solicitudId = :solicitudId ORDER BY fechaCambio ASC")
     fun obtenerHistorialCompleto(solicitudId: Int): Flow<List<HistorialEntity>>
 
-    // Vista de cliente: FILTRA COMENTARIOS INTERNOS (Regla de negocio Sección 3.1)
+    // Vista de cliente: filtra comentarios internos (regla de negocio Sección 3.1)
     @Query(
         """
-            SELECT * FROM historial
-            WHERE solicitudId = :solicitudId
-              AND esComentarioInterno = 0
-            ORDER BY fechaCambio ASC
+        SELECT * FROM historial
+        WHERE solicitudId = :solicitudId
+          AND esComentarioInterno = 0
+        ORDER BY fechaCambio ASC
         """
     )
     fun obtenerHistorialVisibleCliente(solicitudId: Int): Flow<List<HistorialEntity>>
 
-    // Última actualización para vista resumen del cliente (Criterio 10)
+    // Historial de acciones del técnico (PDF Pág. 7)
+    @Query("SELECT * FROM historial WHERE usuarioId = :usuarioId ORDER BY fechaCambio DESC")
+    fun obtenerHistorialPorUsuario(usuarioId: Int): Flow<List<HistorialEntity>>
+
+    // Última actualización para la vista resumen del cliente (Criterio 10)
     @Query("SELECT * FROM historial WHERE solicitudId = :solicitudId ORDER BY fechaCambio DESC LIMIT 1")
     suspend fun obtenerUltimaActualizacion(solicitudId: Int): HistorialEntity?
 

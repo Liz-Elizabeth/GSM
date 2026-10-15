@@ -23,7 +23,8 @@ import androidx.room.PrimaryKey
     ],
     indices = [
         Index(value = ["solicitudId"]),
-        Index(value = ["usuarioId"])
+        Index(value = ["usuarioId"]),
+        Index(value = ["estadoRevision"])
     ]
 )
 data class EvidenciaEntity(
@@ -36,5 +37,8 @@ data class EvidenciaEntity(
     val tamanoBytes: Long,
     val uriLocal: String,
     val descripcion: String? = null,
+    // --- CAMPO NUEVO OBLIGATORIO SEGÚN PDF PÁG. 11 ---
+    val estadoRevision: String = "PENDIENTE", // "PENDIENTE", "APROBADA", "RECHAZADA"
+    // -------------------------------------------------
     val fechaIncorporacion: Long = System.currentTimeMillis()
 )

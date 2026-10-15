@@ -15,10 +15,14 @@ data class UsuarioEntity(
     val id: Int = 0,
     val nombre: String,
     val correo: String,
-    val password: String, // Para simulación de login por perfil
+    val password: String, // Simulación de login académico por perfiles
     val rol: String, // CLIENTE, ADMINISTRADOR, TECNICO
     val empresa: String? = null,
     val telefono: String? = null,
+    // --- CAMPOS NUEVOS EXIGIDOS POR PDF PÁG. 8 ---
+    val medioContacto: String? = "WhatsApp", // Canal de comunicación preferente de prueba
+    val serviciosAsociados: String? = null, // Ej: "Hosting, Mantenimiento Web, Soporte Técnico"
+    // ----------------------------------------------
     val activo: Boolean = true,
     val fechaCreacion: Long = System.currentTimeMillis(),
     val fechaActualizacion: Long = System.currentTimeMillis()

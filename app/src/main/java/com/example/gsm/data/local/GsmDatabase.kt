@@ -4,10 +4,12 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.example.gsm.data.local.dao.EvidenciaDao
 import com.example.gsm.data.local.dao.HistorialDao
+import com.example.gsm.data.local.dao.NotificacionDao
 import com.example.gsm.data.local.dao.SolicitudDao
 import com.example.gsm.data.local.dao.UsuarioDao
 import com.example.gsm.data.local.entity.EvidenciaEntity
 import com.example.gsm.data.local.entity.HistorialEntity
+import com.example.gsm.data.local.entity.NotificacionEntity
 import com.example.gsm.data.local.entity.SolicitudEntity
 import com.example.gsm.data.local.entity.UsuarioEntity
 
@@ -16,7 +18,8 @@ import com.example.gsm.data.local.entity.UsuarioEntity
         UsuarioEntity::class,
         SolicitudEntity::class,
         HistorialEntity::class,
-        EvidenciaEntity::class
+        EvidenciaEntity::class,
+        NotificacionEntity::class
     ],
     version = 1,
     exportSchema = false
@@ -27,4 +30,5 @@ abstract class GsmDatabase : RoomDatabase() {
     abstract fun solicitudDao(): SolicitudDao
     abstract fun historialDao(): HistorialDao
     abstract fun evidenciaDao(): EvidenciaDao
+    abstract fun notificacionDao(): NotificacionDao
 }

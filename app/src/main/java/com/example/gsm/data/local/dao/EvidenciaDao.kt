@@ -19,6 +19,10 @@ interface EvidenciaDao {
     @Query("SELECT * FROM evidencias WHERE id = :id")
     suspend fun obtenerEvidenciaPorId(id: Int): EvidenciaEntity?
 
+    // Actualiza el estado de revisión de la evidencia (PDF Pág. 11)
+    @Query("UPDATE evidencias SET estadoRevision = :nuevoEstado WHERE id = :id")
+    suspend fun actualizarEstadoRevision(id: Int, nuevoEstado: String)
+
     @Delete
     suspend fun eliminarEvidencia(evidencia: EvidenciaEntity)
 }

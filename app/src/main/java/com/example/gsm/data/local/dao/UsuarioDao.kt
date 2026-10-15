@@ -33,10 +33,21 @@ interface UsuarioDao {
     @Query("SELECT * FROM usuarios WHERE correo = :correo AND password = :password AND activo = 1 LIMIT 1")
     suspend fun autenticar(correo: String, password: String): UsuarioEntity?
 
-    // Para el panel administrativo al asignar técnico responsable
+    // Listado de técnicos disponibles para asignación
     @Query("SELECT * FROM usuarios WHERE rol = 'TECNICO' AND activo = 1 ORDER BY nombre ASC")
     fun obtenerTecnicosDisponibles(): Flow<List<UsuarioEntity>>
 
+    // Listado de clientes para creación o filtrado administrativo
+    @Query("SELECT * FROM usuarios WHERE rol = 'CLIENTE' AND activo = 1 ORDER BY nombre ASC")
+    fun obtenerClientes(): Flow<List<UsuarioEntity>>
+
     @Query("SELECT * FROM usuarios WHERE rol = :rol AND activo = 1 ORDER BY nombre ASC")
     fun obtenerUsuariosPorRol(rol: String): Flow<List<UsuarioEntity>>
+
+    // Contadores requeridos en "Información de usuarios y perfiles" (PDF Pág. 8)
+    @Query("SELECT COUNT(*) FROM solicitudes WHERE clienteId = :clienteId AND esBorrador = 0")
+    fun contarSolicitudesCreadas(clienteId: Int): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM solicitudes WHERE tecnicoId = :tecnicoId")
+    fun contarSolicitudesAsignadas(tecnicoId: Int): Flow<Int>
 }
