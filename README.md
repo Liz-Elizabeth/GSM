@@ -1,396 +1,733 @@
-# 📱 GSM - Gestión Móvil y Seguimiento de Solicitudes de Clientes
+<div align="center">
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.0+-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+# 📱 GSM
+### Gestión Móvil y Seguimiento de Solicitudes de Clientes
+
+*Una app Android que ordena las solicitudes que hoy se pierden en WhatsApp.*
+
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Android](https://img.shields.io/badge/Android-API%2033%20--%2037-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com/)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Room](https://img.shields.io/badge/Room-SQLite%20(KSP)-F58220.svg?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
-[![Architecture](https://img.shields.io/badge/Architecture-MVVM%20%2B%20SOLID%20%2B%20OWASP-success.svg)](https://developer.android.com/topic/architecture)
-[![Academic Project](https://img.shields.io/badge/Duoc%20UC-DSY1105%20Desarrollo%20Móvil-002B49.svg)](https://www.duoc.cl/)
+[![Room](https://img.shields.io/badge/Room-SQLite-F58220.svg?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
+[![MVVM](https://img.shields.io/badge/Arquitectura-MVVM-success.svg)](https://developer.android.com/topic/architecture)
+[![Duoc UC](https://img.shields.io/badge/Duoc%20UC-DSY1105-002B49.svg)](https://www.duoc.cl/)
+
+**Desarrollado por Elizabeth Reyes y Juan Varas**
+
+</div>
 
 ---
 
-## 📖 1. ¿De qué trata este proyecto? (Contexto del Caso)
+## 📑 Índice
 
-**GSM (Gestión de Solicitudes Móviles)** es una aplicación Android nativa diseñada para resolver la problemática operativa de trazabilidad, coordinación y seguimiento de requerimientos técnicos en una pequeña empresa de servicios informáticos y digitales (desarrollo web, hosting, soporte técnico y marketing digital).
-
-### El Problema que Resuelve
-Actualmente, los clientes envían sus solicitudes por **WhatsApp** (mensajes de texto, audios, imágenes o documentos). Esto provoca que los requerimientos:
-* Se pierdan en conversaciones largas.
-* No tengan un **código único de seguimiento** (`SOL-YYYY-XXXX`).
-* No tengan **prioridad**, **fecha límite (SLA)** ni **técnico responsable** explícito.
-* No registren evidencia formal ni un cierre confirmado por el cliente.
-
-### La Solución GSM
-GSM centraliza todo el ciclo de vida de una solicitud desde su creación hasta su cierre formal, generando un mensaje estructurado listo para compartir en WhatsApp, separando permisos por rol (**Cliente**, **Administrador** y **Técnico**), auditando cada cambio en un historial inmutable y mostrando métricas en tiempo real sin depender de internet (100% *Offline-First* con SQLite/Room).
-
-> **Contexto Académico:** Proyecto semestral para la asignatura **DSY1105 - Desarrollo de Aplicaciones Móviles**, Escuela de Informática y Telecomunicaciones, CITT Puente Alto, Duoc UC.
-
----
-
-## 🎓 2. Guía para Estudiantes de 1er Año (Cómo entender el código desde cero)
-
-Si estás empezando a programar en Android y Kotlin o no recuerdas qué hace cada carpeta, imagina que esta aplicación funciona como un **Restaurante bien organizado**:
-
-```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ 1. ENTITY (Carpeta: data/local/entity) ──► "LAS CAJAS EN LA BODEGA"          │
-│    Son las tablas de la base de datos SQLite. Guardan los datos en la        │
-│    memoria del teléfono para que NO se borren cuando cierras la aplicación.  │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ 2. DAO (Carpeta: data/local/dao) ──► "EL BODEGUERO"                          │
-│    Contiene las consultas SQL (@Query SELECT, @Insert, @Update) para         │
-│    guardar, buscar o filtrar datos dentro de la base de datos Room.          │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ 3. MODEL (Carpeta: model/) ──► "EL PLATO LIMPIO PARA SERVIR"                 │
-│    Son las clases limpias de Kotlin (Solicitud, Usuario, Historial) que      │
-│    viajan hacia las pantallas, sin anotaciones complejas de base de datos.   │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ 4. MAPPER (Carpeta: data/mapper) ──► "EL TRADUCTOR / ADUANA"                 │
-│    Convierte una "Caja de bodega" (Entity) en un "Plato limpio" (Model)      │
-│    usando `.toDomain()`, y viceversa usando `.toEntity()`.                   │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ 5. REPOSITORY (Carpeta: data/repository) ──► "EL JEFE DE COCINA"             │
-│    Aquí viven las reglas del negocio y la seguridad. Ejemplo: cuando el      │
-│    Admin asigna un técnico, el repositorio actualiza la solicitud, anota     │
-│    en el historial y envía una notificación en un solo paso coordinado.      │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ 6. VIEWMODEL (Carpeta: ui/viewmodel) ──► "EL MESERO"                         │
-│    Conecta la cocina (Repository) con las mesas (Pantallas). Mantiene el     │
-│    estado de la pantalla vivo incluso si el usuario gira el teléfono.        │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ 7. COMPOSE UI (Carpeta: ui/view) ──► "EL MENÚ Y LAS MESAS"                   │
-│    Son las pantallas visuales (botones, tarjetas, formularios y colores)     │
-│    construidas con Jetpack Compose y Material Design 3.                      │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 💡 4 Conceptos de Kotlin que verás en el código:
-1. **`suspend fun` (Función Suspendida):** Es una operación que puede tardar unos milisegundos (como escribir en la base de datos o simular red) y se ejecuta en segundo plano (Corrutinas) para que **la pantalla nunca se congele**.
-2. **`Flow<List<Solicitud>>` (Tubería en Vivo):** A diferencia de una lista normal que pides una sola vez, un `Flow` queda escuchando la base de datos. Si alguien cambia el estado de una solicitud, **la pantalla se actualiza sola automáticamente**.
-3. **`Result<T>` y `runCatching { ... }`:** Es una caja de seguridad. Si todo sale bien devuelve `Result.success(dato)`, y si algo falla (por ejemplo, un usuario sin permisos) devuelve `Result.failure(error)` sin que la aplicación se cierre sola (*crash*).
-4. **`require(condicion) { "Mensaje de error" }`:** Es un guardia de seguridad en la entrada de una función. Si la condición no se cumple (ej. un Cliente intentando asignar un técnico), detiene la operación de inmediato y devuelve el mensaje explicativo.
+1. [¿De qué trata el proyecto?](#-1-de-qué-trata-el-proyecto)
+2. [¿En qué fase vamos?](#-2-en-qué-fase-vamos)
+3. [Antes de empezar: conceptos básicos explicados fácil](#-3-antes-de-empezar-conceptos-básicos-explicados-fácil)
+4. [Cómo está organizado el código](#-4-cómo-está-organizado-el-código)
+5. [Cómo viaja la información dentro de la app](#-5-cómo-viaja-la-información-dentro-de-la-app)
+6. [Los 3 roles y lo que puede hacer cada uno](#-6-los-3-roles-y-lo-que-puede-hacer-cada-uno)
+7. [Ciclo de vida de una solicitud](#-7-ciclo-de-vida-de-una-solicitud)
+8. [Los ViewModels explicados línea por línea](#-8-los-viewmodels-explicados-línea-por-línea)
+9. [Datos de prueba (cuentas y solicitudes ficticias)](#-9-datos-de-prueba-cuentas-y-solicitudes-ficticias)
+10. [Seguridad y buenas prácticas aplicadas](#-10-seguridad-y-buenas-prácticas-aplicadas)
+11. [Lo que falta por hacer](#-11-lo-que-falta-por-hacer)
+12. [Cómo ejecutar el proyecto](#-12-cómo-ejecutar-el-proyecto)
+13. [Cómo aportar al proyecto (guía para nuevos desarrolladores)](#-13-cómo-aportar-al-proyecto-guía-para-nuevos-desarrolladores)
+14. [Modelo de datos](#-14-modelo-de-datos)
+15. [Integración con WhatsApp](#-15-integración-con-whatsapp)
+16. [Checklist de criterios del caso](#-16-checklist-de-criterios-del-caso)
+17. [Preguntas frecuentes](#-17-preguntas-frecuentes)
+18. [Autores](#-18-autores)
 
 ---
 
-## 📊 3. Estado Actual de Ingeniería (Barra de Progreso)
+## 📖 1. ¿De qué trata el proyecto?
+
+### 😩 El problema
+Una pequeña empresa de servicios informáticos (desarrollo web, hosting, soporte técnico y marketing digital) recibe las solicitudes de sus clientes por **WhatsApp**. Eso trae problemas:
+
+| Problema | Consecuencia |
+| :--- | :--- |
+| Los mensajes se mezclan en chats largos | Las solicitudes **se pierden** |
+| No hay un número que identifique cada caso | No se puede **hacer seguimiento** |
+| Nadie sabe quién es el responsable | Las tareas **quedan sin atender** |
+| No hay prioridad ni fecha límite | Lo urgente **se atrasa** |
+| No hay un cierre formal | No queda **evidencia** de que se resolvió |
+
+### 💡 La solución: GSM
+GSM es una app Android que:
+
+- ✅ Le da a cada solicitud un **código único** (`SOL-2026-1001`).
+- ✅ Separa lo que puede hacer cada persona según su **rol** (Cliente, Administrador, Técnico).
+- ✅ Guarda un **historial** de cada cambio: quién lo hizo, cuándo y por qué.
+- ✅ Calcula **fechas límite** según la prioridad y avisa cuando algo está **atrasado**.
+- ✅ Prepara un **mensaje listo para WhatsApp** con el código de seguimiento.
+- ✅ Funciona **sin internet**: todo se guarda en el teléfono con Room (SQLite).
+
+> 🎓 **Contexto académico:** proyecto semestral de **DSY1105 - Desarrollo de Aplicaciones Móviles**, Escuela de Informática y Telecomunicaciones, CITT Puente Alto, Duoc UC.
+
+---
+
+## 📊 2. ¿En qué fase vamos?
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    ESTADO ACTUAL DE INGENIERÍA - PROYECTO GSM                ║
+║                     PROGRESO DEL PROYECTO GSM                                ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  FASE 1: Base de Datos (Entities + DAOs)   [██████████] 100% COMPLETADO ✅   ║
-║  FASE 2: Traductores (Mappers)             [██████████] 100% COMPLETADO ✅   ║
-║  FASE 3: Repositorios y Reglas OWASP       [██████████] 100% COMPLETADO ✅   ║
+║  FASE 1  Base de datos (Entities + DAOs)     [██████████] 100%  ✅ LISTO     ║
+║  FASE 2  Traductores (Mappers)               [██████████] 100%  ✅ LISTO     ║
+║  FASE 3  Repositorios y reglas de negocio    [██████████] 100%  ✅ LISTO     ║
+║  FASE 4  ViewModels + Datos de prueba        [██████████] 100%  ✅ LISTO     ║
 ║  ──────────────────────────────────────────────────────────────────────────  ║
-║  PASO PUENTE: Semilla de Datos en Room     [░░░░░░░░░░]   0% <-- SIGUIENTE 📍║
-║  FASE 4: ViewModels (Cerebro de Pantallas) [░░░░░░░░░░]   0% PENDIENTE ⏳    ║
-║  FASE 5: Pantallas (Jetpack Compose UI)    [░░░░░░░░░░]   0% PENDIENTE ⏳    ║
-║  FASE 6: Pruebas Unitarias y APK Final     [░░░░░░░░░░]   0% PENDIENTE ⏳    ║
+║  FASE 5  Pantallas (Jetpack Compose)         [░░░░░░░░░░]   0%  📍 SIGUIENTE ║
+║  FASE 6  Pruebas unitarias y APK final       [░░░░░░░░░░]   0%  ⏳ PENDIENTE ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
-| Fase | Módulo / Componente | Estado | Detalle de Implementación |
-| :--- | :--- | :---: | :--- |
-| **Fase 1** | **Persistencia y Modelado Room** | 🟢 **100% Completado** | 5 entidades relacionales (`Usuario`, `Solicitud`, `Historial`, `Evidencia`, `Notificacion`), llaves foráneas, índices de búsqueda y 5 DAOs reactivos con `Flow`. |
-| **Fase 2** | **Capa de Transformación (Mappers)** | 🟢 **100% Completado** | Aislamiento estricto de MVVM mediante `SolicitudMapper`, `UsuarioMapper` e `HistorialMapper` protegidos con `runCatching`. |
-| **Fase 3** | **Capa de Repositorios y Seguridad** | 🟢 **100% Completado** | Fachada coordinadora `GsmRepository` + 5 sub-repositorios (`SolicitudLocal`, `Usuario`, `Historial`, `Evidencia`, `Notificacion`, `WhatsApp`) con validaciones OWASP y RBAC. |
-| **Fase 4** | **Datos Semilla + Capa ViewModel** | 🟡 **Próxima Etapa** | Precarga automática en `GsmDatabase` + `AuthViewModel` y `GsmViewModel` con `StateFlow`. |
-| **Fase 5** | **Interfaz de Usuario (Jetpack Compose)** | ⏳ **Pendiente** | 5 pantallas Material 3, navegación por roles y animación de envío simulado de WhatsApp. |
-| **Fase 6** | **QA, Pruebas Unitarias y Entrega Final** | ⏳ **Pendiente** | Pruebas unitarias en `ExampleUnitTest.kt`, validación de los 40 criterios del PDF y APK firmado en modo release. |
+| Fase | Qué incluye | Estado |
+| :--- | :--- | :---: |
+| **1. Base de datos** | 5 tablas (`Usuario`, `Solicitud`, `Historial`, `Evidencia`, `Notificacion`) y 5 DAOs | 🟢 Listo |
+| **2. Mappers** | `SolicitudMapper`, `UsuarioMapper`, `HistorialMapper` | 🟢 Listo |
+| **3. Repositorios** | `GsmRepository` + 6 sub-repositorios con validaciones de seguridad por rol | 🟢 Listo |
+| **4. ViewModels** | `AuthViewModel`, `SolicitudViewModel`, `DetalleSolicitudViewModel`, `AdminDashboardViewModel` + datos ficticios en `GsmDatabase` | 🟢 Listo |
+| **5. Pantallas** | Login, Bandeja, Crear, Detalle, Dashboard y navegación en `MainActivity` | 📍 Siguiente |
+| **6. Calidad** | Pruebas unitarias, revisión de los 40 criterios y APK firmado | ⏳ Pendiente |
+
+> ⚠️ **Importante para quien llegue nuevo:** hoy `MainActivity.kt` todavía muestra la plantilla `"Hello Android!"`. La lógica ya existe, pero **todavía no hay pantallas conectadas**. Eso es exactamente la Fase 5.
 
 ---
 
-## 🏗️ 4. Arquitectura y Gráficos de Flujo de Comunicación
+## 🧠 3. Antes de empezar: conceptos básicos explicados fácil
 
-### 4.1 Flujo de un Clic a través de las Capas (MVVM Paso a Paso)
+### 🍽️ La app es como un restaurante
+
+Si nunca has trabajado con Android, piensa en la app como un restaurante donde cada uno tiene un solo trabajo:
 
 ```text
-  👤 USUARIO (Toca un botón en la pantalla, ej: "Crear Solicitud")
-      │
-      ▼
-┌─────────────────────────────────────────────────────────┐
-│ 📱 PANTALLA COMPOSE (ui/view)                           │
-│    Llama al ViewModel: viewModel.crearSolicitud(...)    │
-└─────────────────────────────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────────────────────────────┐
-│ 🧠 VIEWMODEL (ui/viewmodel)                             │
-│    Abre corrutina (segundo plano) y llama a:            │
-│    gsmRepository.crearSolicitud(...)                    │
-└─────────────────────────────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────────────────────────────┐
-│ 🛡️ GSM REPOSITORY (data/repository/GsmRepository.kt)    │
-│    1. Revisa seguridad RBAC (¿Tiene permiso este rol?)  │
-│    2. Genera código único (SOL-2026-XXXX)               │
-│    3. Calcula fecha límite según prioridad (SLA)        │
-│    4. Coordina: Solicitud + Evidencia + Historial       │
-└─────────────────────────────────────────────────────────┘
-      │
-      ▼
-┌─────────────────────────────────────────────────────────┐
-│ 🔄 MAPPER + 💾 DAO (data/mapper y data/local/dao)       │
-│    Convierte a Entity (.toEntity) y hace INSERT en SQL  │
-└─────────────────────────────────────────────────────────┘
-      │
-      ▼
-  ✨ LA TUBERÍA (Flow) AVISA A LA PANTALLA Y SE REDIBUJA SOLA
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  👤 CLIENTE DEL RESTAURANTE  =  El usuario que toca la pantalla              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  📋 EL MENÚ Y LAS MESAS      =  Pantallas Compose      (carpeta ui/view)     │
+│     Lo que el usuario ve: botones, textos, formularios.                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  🧑‍🍳 EL MESERO               =  ViewModel             (carpeta ui/viewmodel)│
+│     Recibe el pedido de la mesa y se lo lleva a la cocina.                   │
+│     Trae la comida de vuelta y la deja en la mesa.                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  👨‍🍳 EL JEFE DE COCINA       =  Repository            (carpeta repository)  │
+│     Decide las reglas: "un cliente no puede asignar técnicos",               │
+│     "toda solicitud nueva lleva código", "todo cambio va al historial".      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  🔄 EL TRADUCTOR             =  Mapper                (carpeta mapper)       │
+│     Convierte las cajas de la bodega en platos listos para servir.           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  📦 EL BODEGUERO             =  DAO                   (carpeta dao)          │
+│     Sabe exactamente dónde está cada cosa. Habla en SQL.                     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  🏬 LA BODEGA                =  Room / SQLite          (GsmDatabase)         │
+│     Donde se guarda todo, aunque cierres la app.                             │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Mapa General de Comunicación entre Componentes (Mermaid)
+> 💡 **Regla de oro:** cada capa solo habla con la que tiene al lado. La pantalla **nunca** habla directo con la base de datos. Siempre pasa por el ViewModel y el Repository.
+
+### 📚 Mini diccionario de Kotlin y Android
+
+| Palabra | Qué significa en simple | Ejemplo en el proyecto |
+| :--- | :--- | :--- |
+| `data class` | Una clase que solo guarda datos | `Solicitud`, `Usuario` |
+| `enum class` | Una lista cerrada de opciones | `EstadoSolicitud.RECIBIDA` |
+| `suspend fun` | Función que puede tardar; corre en segundo plano para no congelar la app | `crearSolicitud(...)` |
+| `Flow<T>` | Una "tubería en vivo": cada vez que cambia la base de datos, llegan datos nuevos | `listarSolicitudes()` |
+| `.collect { }` | Abrir la llave de la tubería y recibir los datos | `flujo.collect { lista -> ... }` |
+| `viewModelScope.launch { }` | "Haz esto en segundo plano y cancélalo solo si se cierra la pantalla" | Todas las funciones de los ViewModels |
+| `mutableStateOf(...)` | Variable que avisa a la pantalla cuando cambia | `var usuarioActual by mutableStateOf(...)` |
+| `private set` | La pantalla puede **leer** la variable, pero solo el ViewModel puede **cambiarla** | En todos los ViewModels |
+| `Result<T>` | Una caja que trae **éxito** o **error**, sin cerrar la app | `if (resultado.isSuccess) ...` |
+| `require(...)` | Un guardia: si la condición no se cumple, detiene la función con un mensaje | `require(admin.rol == ADMINISTRADOR)` |
+| `?` (nullable) | Esta variable puede estar vacía (`null`) | `tecnicoId: Int?` |
+| `?:` (Elvis) | "Si es null, usa esto otro" | `mensaje ?: "Error"` |
+
+---
+
+## 📂 4. Cómo está organizado el código
+
+```text
+GSM/
+├── 📄 README.md                         ← Estás aquí
+├── 📄 build.gradle.kts                  ← Configuración general
+├── 📁 gradle/
+│   └── libs.versions.toml               ← Versiones de las librerías
+└── 📁 app/
+    ├── 📄 build.gradle.kts              ← Dependencias de la app (Compose, Room...)
+    └── 📁 src/main/java/com/example/gsm/
+        │
+        ├── 📄 MainActivity.kt           ← Punto de entrada (⏳ falta conectar pantallas)
+        │
+        ├── 📁 model/                    ← 🍽️ "Platos limpios" (modelos de dominio)
+        │   ├── Solicitud.kt
+        │   ├── Usuario.kt
+        │   ├── Historial.kt
+        │   ├── CategoriaSolicitud.kt    ← enum: DESARROLLO_WEB, HOSTING, ...
+        │   ├── EstadoSolicitud.kt       ← enum: RECIBIDA, EN_PROCESO, ...
+        │   ├── PrioridadSolicitud.kt    ← enum: BAJA, MEDIA, ALTA, URGENTE
+        │   ├── RolUsuario.kt            ← enum: CLIENTE, ADMINISTRADOR, TECNICO
+        │   └── SolicitudModels.kt       ← DTOs para consultas con JOIN
+        │
+        ├── 📁 data/
+        │   ├── 📁 local/                ← 🏬 La bodega (Room)
+        │   │   ├── GsmDatabase.kt       ← Conexión única + datos de prueba
+        │   │   ├── 📁 entity/           ← 📦 Tablas SQLite
+        │   │   │   ├── UsuarioEntity.kt
+        │   │   │   ├── SolicitudEntity.kt
+        │   │   │   ├── HistorialEntity.kt
+        │   │   │   ├── EvidenciaEntity.kt
+        │   │   │   └── NotificacionEntity.kt
+        │   │   └── 📁 dao/              ← 🧑‍🔧 Consultas SQL
+        │   │       ├── UsuarioDao.kt
+        │   │       ├── SolicitudDao.kt
+        │   │       ├── HistorialDao.kt
+        │   │       ├── EvidenciaDao.kt
+        │   │       └── NotificacionDao.kt
+        │   │
+        │   ├── 📁 mapper/               ← 🔄 Traductores Entity ⇄ Model
+        │   │   ├── SolicitudMapper.kt
+        │   │   ├── UsuarioMapper.kt
+        │   │   └── HistorialMapper.kt
+        │   │
+        │   └── 📁 repository/           ← 👨‍🍳 Reglas de negocio
+        │       ├── GsmRepository.kt             ← Coordinador principal
+        │       ├── SolicitudLocalRepository.kt  ← Guardar/leer solicitudes, código y SLA
+        │       ├── UsuarioRepository.kt         ← Login y listas de usuarios
+        │       ├── HistorialRepository.kt       ← Auditoría (oculta notas internas al cliente)
+        │       ├── EvidenciaRepository.kt       ← Archivos adjuntos (máx. 5 MB)
+        │       ├── NotificacionRepository.kt    ← Avisos locales
+        │       └── WhatsAppRepository.kt        ← Mensaje para WhatsApp
+        │
+        └── 📁 ui/
+            ├── 📁 theme/                ← Colores y tipografía
+            ├── 📁 viewmodel/            ← 🧑‍🍳 Meseros (✅ listos)
+            │   ├── AuthViewModel.kt
+            │   ├── SolicitudViewModel.kt
+            │   ├── DetalleSolicitudViewModel.kt
+            │   └── AdminDashboardViewModel.kt
+            └── 📁 view/                 ← 📋 Pantallas (⏳ Fase 5)
+```
+
+---
+
+## 🔄 5. Cómo viaja la información dentro de la app
+
+### 5.1 Un clic, paso a paso
+
+Ejemplo: el cliente toca **"Enviar solicitud"**.
+
+```text
+  👤 El cliente toca "Enviar solicitud"
+        │
+        ▼
+┌────────────────────────────────────────────────────────────┐
+│ 📋 PANTALLA (CrearSolicitudScreen)                         │
+│    Llama: solicitudVm.crearSolicitud(titulo, ...)          │
+└────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────────────────────────────┐
+│ 🧑‍🍳 VIEWMODEL (SolicitudViewModel)                         │
+│    Abre viewModelScope.launch { ... } (segundo plano)      │
+│    Llama: repo.crearSolicitud(...)                         │
+└────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────────────────────────────┐
+│ 👨‍🍳 REPOSITORY (GsmRepository)                              │
+│    1. Revisa que título y descripción no estén vacíos      │
+│    2. Genera el código SOL-2026-XXXX                       │
+│    3. Calcula la fecha límite según la prioridad           │
+│    4. Guarda la solicitud, la evidencia y el historial     │
+└────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────────────────────────────┐
+│ 🔄 MAPPER  →  📦 DAO  →  🏬 ROOM                            │
+│    solicitud.toEntity()  →  INSERT INTO solicitudes ...    │
+└────────────────────────────────────────────────────────────┘
+        │
+        ▼
+  ✨ Room avisa por el Flow → el ViewModel actualiza su variable
+     → la pantalla se redibuja sola con la solicitud nueva
+```
+
+### 5.2 Mapa general de componentes
 
 ```mermaid
 flowchart TD
-    subgraph ACTORES ["👥 Roles de Usuario"]
+    subgraph ACTORES ["👥 Usuarios"]
         CLI["👤 Cliente"]
         ADM["👔 Administrador"]
         TEC["🔧 Técnico"]
     end
 
-    subgraph UI_LAYER ["📱 Capa de Presentación (Jetpack Compose)"]
-        UI["Pantallas Compose (Login, Bandeja, Crear, Detalle, Dashboard)"]
-        VM["ViewModels (StateFlow / UI State)"]
-        Anim["Animación UI WhatsApp"]
-        CLI & ADM & TEC --> UI
-        UI <--> |Eventos / StateFlow| VM
+    subgraph UI ["📋 Pantallas - Fase 5"]
+        SCREENS["Login, Bandeja, Crear, Detalle, Dashboard"]
     end
 
-    subgraph REPO_LAYER ["🛡️ Capa de Negocio y Coordinación (Repositories)"]
-        GsmRepo["GsmRepository (Fachada Coordinadora + RBAC)"]
-        UsrRepo["UsuarioRepository"]
-        SolLocalRepo["SolicitudLocalRepository"]
-        HistRepo["HistorialRepository"]
-        EvidRepo["EvidenciaRepository"]
-        NotifRepo["NotificacionRepository"]
-        WARepo["WhatsAppRepository"]
-
-        VM <--> GsmRepo
-        VM <--> UsrRepo
-        GsmRepo --> SolLocalRepo
-        GsmRepo --> HistRepo
-        GsmRepo --> EvidRepo
-        GsmRepo --> NotifRepo
-        GsmRepo --> WARepo
+    subgraph VM ["🧑‍🍳 ViewModels - Fase 4"]
+        AUTH["AuthViewModel"]
+        SOL["SolicitudViewModel"]
+        DET["DetalleSolicitudViewModel"]
+        DASH["AdminDashboardViewModel"]
     end
 
-    subgraph MAPPER_LAYER ["🔄 Aduana de Transformación (Mappers)"]
-        SM["SolicitudMapper.kt"]
-        UM["UsuarioMapper.kt"]
-        HM["HistorialMapper.kt"]
-        SolLocalRepo <--> SM
-        UsrRepo <--> UM
-        HistRepo <--> HM
+    subgraph REPO ["👨‍🍳 Repositorios - Fase 3"]
+        GSM["GsmRepository"]
+        USR["UsuarioRepository"]
+        LOC["SolicitudLocalRepository"]
+        HIS["HistorialRepository"]
+        EVI["EvidenciaRepository"]
+        NOT["NotificacionRepository"]
+        WA["WhatsAppRepository"]
     end
 
-    subgraph DATA_LAYER ["💾 Capa de Persistencia (Room / SQLite)"]
-        DAOs["5 Room DAOs (Solicitud, Usuario, Historial, Evidencia, Notificacion)"]
-        DB[("GsmDatabase (SQLite Local)")]
-        SM & UM & HM <--> DAOs
-        EvidRepo & NotifRepo <--> DAOs
-        DAOs <--> DB
+    subgraph DATA ["🏬 Datos - Fases 1 y 2"]
+        MAP["Mappers"]
+        DAO["DAOs"]
+        DB[("GsmDatabase")]
     end
 
-    WARepo -.->|"Simulación de Envío (Delay)"| Anim
+    CLI & ADM & TEC --> SCREENS
+    SCREENS --> AUTH & SOL & DET & DASH
+    AUTH --> USR
+    DET --> USR
+    SOL & DET & DASH --> GSM
+    GSM --> LOC & HIS & EVI & NOT & WA
+    USR & LOC & HIS --> MAP
+    MAP --> DAO
+    EVI & NOT --> DAO
+    DAO --> DB
 ```
 
-### 4.3 Flujo de Negocio Completo entre los 3 Roles
+### 5.3 ¿Qué ViewModel usa cada pantalla?
+
+| Pantalla (Fase 5) | ViewModel que usa | Para qué |
+| :--- | :--- | :--- |
+| `LoginScreen` | `AuthViewModel` | Iniciar sesión y botones de cuentas demo |
+| `BandejaScreen` | `SolicitudViewModel` | Ver la lista, buscar y filtrar |
+| `CrearSolicitudScreen` | `SolicitudViewModel` | Crear solicitud o guardar borrador |
+| `DetalleSolicitudScreen` | `DetalleSolicitudViewModel` | Ver detalle, historial y cambiar estados |
+| `AdminDashboardScreen` | `AdminDashboardViewModel` | Ver contadores en tiempo real |
+
+---
+
+## 👥 6. Los 3 roles y lo que puede hacer cada uno
+
+| Acción | 👤 Cliente | 👔 Administrador | 🔧 Técnico |
+| :--- | :---: | :---: | :---: |
+| Crear solicitud | ✅ | ❌ | ❌ |
+| Guardar borrador | ✅ | ❌ | ❌ |
+| Ver solicitudes | Solo las suyas | Todas | Solo las asignadas |
+| Clasificar y dar prioridad | ❌ | ✅ | ❌ |
+| Asignar técnico | ❌ | ✅ | ❌ |
+| Registrar avance | ❌ | ✅ | ✅ |
+| Pedir más información | ❌ | ✅ | ✅ |
+| Responder información pedida | ✅ | ❌ | ❌ |
+| Registrar solución | ❌ | ✅ | ✅ |
+| Confirmar cierre | ✅ (si está Resuelta) | ✅ | ❌ |
+| Pedir reapertura | ✅ | ❌ | ❌ |
+| Cancelar solicitud | ❌ | ✅ | ❌ |
+| Ver comentarios internos | ❌ | ✅ | ✅ |
+| Ver métricas | ❌ | ✅ | ❌ |
+
+> 🛡️ Estas reglas **no dependen de que la pantalla esconda un botón**. Están validadas dentro de `GsmRepository` con `require(...)`. Aunque alguien llamara a la función directamente, el repositorio la rechaza.
+
+### Flujo completo entre los 3 roles
 
 ```text
   [ 👤 CLIENTE ]                  [ 👔 ADMINISTRADOR ]             [ 🔧 TÉCNICO ]
         │                                  │                             │
-  1. Inicia sesión                         │                             │
-  2. Crea Solicitud                        │                             │
-     (Título, Categoría,                   │                             │
-      Evidencia ficticia)                  │                             │
+  1. Crea la solicitud                     │                             │
+     Estado: RECIBIDA                      │                             │
+     Código: SOL-2026-XXXX                 │                             │
+     Comparte por WhatsApp 📲              │                             │
         │                                  │                             │
-        ▼                                  │                             │
-  Estado: [RECIBIDA]                       │                             │
-  Genera: SOL-2026-XXXX                    │                             │
-  Comparte a WhatsApp 📲                   │                             │
-        │                                  │                             │
-        └─────────────────────────► 3. Ve solicitud nueva                │
-                                    4. Clasifica y da Prioridad          │
-                                       Estado: [EN_REVISION]             │
-                                    5. ¿Faltan datos?                    │
-                                       ├── SÍ ──► [PENDIENTE_INFO]       │
-                                       │          (Cliente responde)     │
-                                       ▼                                 │
-                                    6. Asigna un Técnico                 │
-                                       Estado: [ASIGNADA]                │
+        └─────────────────────────► 2. Clasifica y da prioridad          │
+                                       Estado: EN_REVISION               │
+                                    3. Asigna un técnico                 │
+                                       Estado: ASIGNADA                  │
                                        │                                 │
-                                       └────────────────────────► 7. Ve su bandeja
-                                                                  8. Registra avance
-                                                                     Estado: [EN_PROCESO]
-                                                                  9. Registra solución
-                                                                     Estado: [RESUELTA]
-                                                                         │
-  10. Recibe aviso ◄─────────────────────────────────────────────────────┘
-      ¿Está conforme?
-      ├── SÍ ──► Confirma cierre ──► Estado: [CERRADA] ✅ (Fin del flujo)
-      └── NO ──► Pide reapertura ──► Vuelve a [EN_REVISION] 🔄
+                                       └────────────────────────► 4. Registra avance
+                                                                     Estado: EN_PROCESO
+                                                                  5. ¿Falta información?
+                                                                     └─► PENDIENTE_INFORMACION
+  6. Responde con antecedentes ◄─────────────────────────────────────────┘
+        │                                                                │
+        └──────────────────────────────────────────────────────────► 7. Registra solución
+                                                                     Estado: RESUELTA
+  8. ¿Está conforme? ◄───────────────────────────────────────────────────┘
+     ├── SÍ ──► Confirma cierre ──► CERRADA ✅
+     └── NO ──► Pide reapertura ──► vuelve a EN_REVISION 🔄
 ```
 
-### 4.4 Diagrama de Estados Oficial (Ciclo de Vida de una Solicitud)
+---
+
+## 🔁 7. Ciclo de vida de una solicitud
+
+Cada flecha de este diagrama queda registrada en la tabla `historial`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Borrador: Cliente guarda avance temporal
-    Borrador --> Recibida: Cliente envía formalmente
-    [*] --> Recibida: Cliente crea solicitud (Genera código único)
-    Recibida --> EnRevision: Admin clasifica y define prioridad
-    EnRevision --> PendienteInformacion: Requiere antecedentes adicionales
-    PendienteInformacion --> EnRevision: Cliente responde (sin técnico aún)
-    PendienteInformacion --> EnProceso: Cliente responde (con técnico asignado)
-    EnRevision --> Asignada: Admin asigna técnico responsable
-    Asignada --> EnProceso: Técnico registra avance / inicia trabajo
-    EnProceso --> PendienteInformacion: Técnico solicita más antecedentes
-    EnProceso --> Resuelta: Técnico registra solución técnica
-    Resuelta --> Cerrada: Cliente confirma conformidad (o Admin)
-    Resuelta --> EnRevision: Cliente solicita reapertura del caso
-    Cerrada --> EnRevision: Cliente solicita reapertura justificada
-    Recibida --> Cancelada: Admin cancela con motivo justificado
-    EnRevision --> Cancelada: Admin cancela con motivo justificado
+    [*] --> Borrador: Cliente guarda sin enviar
+    [*] --> Recibida: Cliente envía (se genera el código)
+    Recibida --> EnRevision: Admin clasifica y da prioridad
+    EnRevision --> Asignada: Admin asigna técnico
+    Asignada --> EnProceso: Técnico registra avance
+    EnProceso --> PendienteInformacion: Técnico pide antecedentes
+    EnRevision --> PendienteInformacion: Admin pide antecedentes
+    PendienteInformacion --> EnProceso: Cliente responde (ya hay técnico)
+    PendienteInformacion --> EnRevision: Cliente responde (sin técnico)
+    EnProceso --> Resuelta: Técnico registra solución
+    Resuelta --> Cerrada: Cliente confirma conformidad
+    Resuelta --> EnRevision: Cliente pide reapertura
+    Cerrada --> EnRevision: Cliente pide reapertura
+    Recibida --> Cancelada: Admin cancela con motivo
+    EnRevision --> Cancelada: Admin cancela con motivo
     Cerrada --> [*]
     Cancelada --> [*]
 ```
 
----
+### ⏱️ Fecha límite según prioridad (SLA)
 
-## 🛡️ 5. Principios SOLID y Seguridad OWASP Aplicados
+| Prioridad | Tiempo para resolver |
+| :--- | :--- |
+| 🔴 URGENTE | 6 horas |
+| 🟠 ALTA | 24 horas (1 día) |
+| 🟡 MEDIA | 72 horas (3 días) |
+| 🟢 BAJA | 168 horas (7 días) |
 
-El proyecto fue auditado bajo principios de ingeniería de software limpia (**SOLID + KISS**) y protección contra vulnerabilidades (**OWASP Mobile Top 10**), cumpliendo las restricciones de las páginas 6, 8, 15 y 16 del documento del caso:
-
-### 5.1 Principios SOLID en el Proyecto
-* **S — Single Responsibility Principle (Responsabilidad Única):** Cada sub-repositorio tiene una única razón para cambiar:
-  * `SolicitudLocalRepository`: Solo CRUD de solicitudes, generación de código `SOL-YYYY-XXXX` y cálculo de SLA.
-  * `HistorialRepository`: Solo bitácora de auditoría y filtro de privacidad para ocultar comentarios internos al cliente.
-  * `EvidenciaRepository`: Solo validación y registro de archivos adjuntos ficticios.
-  * `NotificacionRepository`: Solo alertas locales por cambios de estado.
-  * `WhatsAppRepository`: Solo formato de texto estructurado y simulación de envío.
-  * `GsmRepository`: Fachada coordinadora que une los pasos anteriores de forma atómica.
-* **O — Open/Closed Principle (Abierto/Cerrado):** El uso de `enum class` (`CategoriaSolicitud`, `EstadoSolicitud`, `PrioridadSolicitud`, `RolUsuario`) permite extender comportamientos sin alterar la estructura de base de datos.
-* **D — Dependency Inversion Principle (Inversión de Dependencias):** Los repositorios reciben sus DAOs por constructor en lugar de instanciarlos internamente, facilitando las pruebas unitarias.
-
-### 5.2 Seguridad OWASP y Matriz de Control de Acceso (RBAC)
-1. **Prevención de Control de Acceso Roto (OWASP M1 / A01):**
-   `GsmRepository` valida mediante cláusulas de guarda (`require(...)`) el rol del usuario y el estado previo antes de tocar la base de datos:
-   * ❌ Un `CLIENTE` no puede clasificar, cambiar prioridad, asignar técnicos, registrar avances técnicos ni cancelar solicitudes.
-   * ❌ Un `CLIENTE` no puede modificar ni cerrar solicitudes de otro cliente (`solicitud.clienteId == usuario.id`).
-   * ❌ Un `CLIENTE` no puede ver comentarios marcados como `esComentarioInterno = true` (`HistorialRepository` los filtra desde SQLite).
-   * ❌ Un `TECNICO` no puede cerrar definitivamente una solicitud sin confirmación de conformidad.
-   * ❌ Ninguna solicitud puede pasar a `CERRADA` si no está previamente en estado `RESUELTA`.
-2. **Validación de Entradas y Archivos Adjuntos (OWASP M4 — Pág. 16 del PDF):**
-   `EvidenciaRepository` restringe estrictamente los archivos de prueba:
-   * **Formatos permitidos:** `image/jpeg`, `image/png`, `application/pdf`, `text/plain`.
-   * **Tamaño máximo:** Límite estricto de **5 MB** (`5 * 1024 * 1024 bytes`).
-3. **Privacidad de Datos (OWASP M2 / M9 — Págs. 13 y 15 del PDF):**
-   * Uso exclusivo de cuentas, empresas y archivos sintéticos/ficticios.
-   * El mensaje estructurado de WhatsApp incluye código, título, categoría y enlace ficticio de seguimiento (`https://gsm-soporte.cl/seguimiento/SOL-YYYY-XXXX`), sin exponer contraseñas, RUT ni conversaciones privadas.
+Si pasa la fecha límite y la solicitud no está `RESUELTA`, `CERRADA` ni `CANCELADA`, se considera **atrasada**.
 
 ---
 
-## 🗂️ 6. Hoja de Ruta en Recuadros (Lo que falta para terminar el 100%)
+## 🧑‍🍳 8. Los ViewModels explicados línea por línea
+
+Los 4 ViewModels siguen **la misma receta**. Si entiendes uno, entiendes todos.
+
+### 🧾 La receta (3 ingredientes)
+
+```kotlin
+class EjemploViewModel(
+    private val repo: GsmRepository          // 1️⃣ Recibe el repositorio por el constructor
+) : ViewModel() {
+
+    var mensaje by mutableStateOf<String?>(null)   // 2️⃣ Variable que la pantalla observa
+        private set                                //    La pantalla la lee, no la cambia
+
+    fun hacerAlgo() {
+        viewModelScope.launch {                    // 3️⃣ Trabajo en segundo plano
+            val resultado = repo.algunaFuncion()
+            if (resultado.isSuccess) {
+                mensaje = "¡Listo!"                //    Cambias con un simple "="
+            } else {
+                mensaje = "Hubo un error"
+            }
+        }
+    }
+}
+```
+
+### 🔐 `AuthViewModel` — La puerta de entrada
+
+| Variable | Qué guarda |
+| :--- | :--- |
+| `usuarioActual` | Quién inició sesión (`null` = nadie) |
+| `cargando` | `true` mientras revisa el login |
+| `mensajeError` | Texto del error si el login falla |
+
+| Función | Qué hace |
+| :--- | :--- |
+| `iniciarSesion(correo, password)` | Revisa las credenciales en la base de datos |
+| `iniciarSesionDemo(rol)` | Entra con 1 clic con una cuenta ficticia |
+| `cerrarSesion()` | Deja `usuarioActual` en `null` |
+
+### 📥 `SolicitudViewModel` — La bandeja
+
+| Variable | Qué guarda |
+| :--- | :--- |
+| `listaSolicitudes` | Lo que se ve en la bandeja |
+| `estadoFiltro`, `prioridadFiltro`, `soloAtrasadas`, `textoBusqueda` | Los filtros activos |
+| `mensaje` | Aviso de éxito o error |
+
+| Función | Qué hace |
+| :--- | :--- |
+| `cargarSolicitudes(usuario)` | Pide la lista respetando el rol (cliente ve las suyas, técnico las asignadas) |
+| `cambiarFiltroEstado / Prioridad / Atrasadas` | Cambia un filtro y recarga la lista |
+| `cambiarTextoBusqueda(texto, usuario)` | Busca por código o título |
+| `crearSolicitud(...)` | Crea una solicitud o un borrador |
+
+> 💡 **Detalle importante:** `cargarSolicitudes` guarda la búsqueda en `busquedaActual` y hace `busquedaActual?.cancel()` antes de abrir otra. Así, si el usuario cambia 5 filtros seguidos, no quedan 5 búsquedas abiertas al mismo tiempo.
+
+### 🔍 `DetalleSolicitudViewModel` — La ficha de una solicitud
+
+| Variable | Qué guarda |
+| :--- | :--- |
+| `solicitud` | La solicitud que se está viendo |
+| `historial` | Todos los cambios (sin notas internas si es cliente) |
+| `evidencias` | Archivos adjuntos |
+| `tecnicosDisponibles` | Para que el admin elija a quién asignar |
+| `mensajeWhatsApp`, `enviandoWhatsApp` | Texto y animación de WhatsApp |
+| `mensaje` | Aviso de éxito o error |
+
+**Botones por rol:**
+
+| 👔 Administrador | 🔧 Técnico | 👤 Cliente |
+| :--- | :--- | :--- |
+| `clasificarYPriorizar` | `registrarAvance` | `responderInformacion` |
+| `asignarTecnico` | `solicitarInformacion` | `confirmarCierre` |
+| `cancelar` | `registrarResolucion` | `solicitarReapertura` |
+
+> 💡 **Para no repetir código:** los 9 botones usan una función ayudante llamada `ejecutarCambio(...)`. Ella hace el `if (resultado.isSuccess)`, muestra el mensaje y recarga el detalle. Así cada botón queda de 3 líneas.
+
+### 📊 `AdminDashboardViewModel` — Los números
+
+Tiene una variable por cada contador (`recibidas`, `enProceso`, `atrasadas`, `prioridadUrgente`, `porTecnico`, etc.). En el bloque `init { }` se conecta a Room, así que **los números se actualizan solos** cuando cambia cualquier solicitud.
+
+---
+
+## 🧪 9. Datos de prueba (cuentas y solicitudes ficticias)
+
+La primera vez que se abre la app, `GsmDatabase` revisa si está vacía. Si lo está, carga estos datos automáticamente.
+
+### 🔑 Cuentas de prueba (contraseña de todas: `1234`)
+
+| Rol | Correo | Nombre ficticio |
+| :--- | :--- | :--- |
+| 👤 Cliente | `cliente@pyme.cl` | Camila Rojas |
+| 👔 Administrador | `admin@gsm.cl` | Roberto Méndez |
+| 🔧 Técnico | `tecnico1@gsm.cl` | Diego Soto |
+| 🔧 Técnico | `tecnico2@gsm.cl` | Valentina Pino |
+
+### 📋 Solicitudes de prueba
+
+| Código | Título | Estado | Para demostrar |
+| :--- | :--- | :--- | :--- |
+| `SOL-2026-1001` | Error 500 al subir catálogo | 🔵 RECIBIDA | Clasificar y asignar técnico |
+| `SOL-2026-1002` | Caída del correo corporativo | 🔴 EN_PROCESO **atrasada** | Alerta de atraso y métricas |
+| `SOL-2026-1003` | Banner de campaña de invierno | 🟡 PENDIENTE_INFORMACION | Que el cliente responda |
+| `SOL-2026-1004` | Subdominio para pruebas | 🟢 RESUELTA | Confirmar cierre o pedir reapertura |
+
+> 🧹 **¿Quieres volver a los datos iniciales?** Desinstala la app del emulador (o borra sus datos en *Ajustes → Apps → GSM → Almacenamiento*) y ábrela de nuevo.
+
+---
+
+## 🛡️ 10. Seguridad y buenas prácticas aplicadas
+
+### Seguridad (OWASP Mobile)
+
+| Riesgo | Cómo lo evitamos | Dónde |
+| :--- | :--- | :--- |
+| **Control de acceso roto** | Cada acción revisa el rol con `require(...)` antes de tocar la base de datos | `GsmRepository` |
+| **Cliente viendo datos ajenos** | Se valida `solicitud.clienteId == cliente.id` | `GsmRepository` |
+| **Fuga de notas internas** | Si el rol es CLIENTE se usa una consulta que excluye comentarios internos | `HistorialRepository` |
+| **Archivos peligrosos** | Solo JPG, PNG, PDF y TXT; máximo 5 MB | `EvidenciaRepository` |
+| **Entradas vacías** | Se valida que título, descripción, motivos y comentarios no estén vacíos | `GsmRepository`, `UsuarioRepository` |
+| **Saltarse el flujo** | No se puede cerrar una solicitud que no esté `RESUELTA` | `GsmRepository.confirmarCierre` |
+| **Datos personales reales** | Todas las cuentas, empresas y archivos son ficticios | `GsmDatabase` |
+
+### Principios SOLID (siendo honestos)
+
+| Principio | ¿Se cumple? | Explicación |
+| :--- | :---: | :--- |
+| **S** – Responsabilidad única | ✅ | Cada repositorio y cada ViewModel tiene un solo trabajo |
+| **O** – Abierto/Cerrado | 🟡 Parcial | Los `enum` permiten agregar opciones sin tocar la lógica, pero agregar un estado nuevo exige revisar los `when` |
+| **L** – Sustitución de Liskov | ➖ No aplica | No usamos herencia entre nuestras clases |
+| **I** – Segregación de interfaces | 🟡 Parcial | `AdminDashboardViewModel` recibe el `GsmRepository` completo aunque solo usa las métricas |
+| **D** – Inversión de dependencias | 🟡 Parcial | Las dependencias llegan por constructor (inyección manual), pero son clases concretas, no interfaces |
+
+> 🎓 **Decisión consciente:** los ViewModels usan `mutableStateOf` en vez de `StateFlow` + `UiState`. Es más simple de leer y suficiente para el alcance del proyecto. Migrar a `StateFlow` queda como mejora futura.
+
+---
+
+## 🗺️ 11. Lo que falta por hacer
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║ 🟧 RECUADRO A: CONEXIÓN Y DATOS SEMILLA (Paso Puente)                        ║
+║ 🟦 FASE 5 - PANTALLAS Y NAVEGACIÓN                         📍 SIGUIENTE PASO ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  📄 Archivo: data/local/GsmDatabase.kt                                       ║
-║  🎯 ¿Para qué sirve?                                                         ║
-║     1. Crea una única conexión a la base de datos (`getInstance`).           ║
-║     2. Inserta automáticamente usuarios ficticios al abrir la app:           ║
-║        • cliente@pyme.cl      (Rol: CLIENTE)                                 ║
-║        • admin@gsm.cl         (Rol: ADMINISTRADOR)                           ║
-║        • tecnico1@gsm.cl      (Rol: TECNICO)                                 ║
-║        • tecnico2@gsm.cl      (Rol: TECNICO)                                 ║
-║     3. Inserta 4 solicitudes de ejemplo (1 Recibida, 1 Atrasada,             ║
-║        1 En Proceso, 1 Resuelta) para demostrar la app desde el minuto 1.    ║
+║  [ ] 1. GsmViewModelFactory.kt                                               ║
+║        Los ViewModels reciben repositorios en el constructor, así que        ║
+║        Android necesita una "fábrica" que sepa cómo crearlos.                ║
+║                                                                              ║
+║  [ ] 2. LoginScreen.kt          → usa AuthViewModel                          ║
+║  [ ] 3. BandejaScreen.kt        → usa SolicitudViewModel                     ║
+║  [ ] 4. CrearSolicitudScreen.kt → usa SolicitudViewModel                     ║
+║  [ ] 5. DetalleSolicitudScreen.kt → usa DetalleSolicitudViewModel            ║
+║  [ ] 6. AdminDashboardScreen.kt → usa AdminDashboardViewModel                ║
+║                                                                              ║
+║  [ ] 7. MainActivity.kt                                                      ║
+║        Crear GsmDatabase + repositorios + fábrica y navegar entre            ║
+║        pantallas con una variable simple:                                    ║
+║        var pantallaActual by remember { mutableStateOf("login") }            ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║ 🟨 RECUADRO B: FASE 4 - CAPA VIEWMODEL (El cerebro de las pantallas)         ║
+║ 🟩 FASE 6 - CALIDAD Y ENTREGA                                  ⏳ PENDIENTE  ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  En la carpeta `ui/viewmodel/` se implementarán 2 ViewModels simples:        ║
-║                                                                              ║
-║  📄 1. AuthViewModel.kt                                                      ║
-║     • Guarda quién es el usuario conectado (`usuarioActual`).                ║
-║     • Funciones `iniciarSesion(correo, password)` y `cerrarSesion()`.        ║
-║     • Función `entrarComoDemo(rol)` para cambiar de perfil con 1 toque.      ║
-║                                                                              ║
-║  📄 2. GsmViewModel.kt                                                       ║
-║     • Conecta con `GsmRepository` y `UsuarioRepository`.                     ║
-║     • Entrega la bandeja de solicitudes filtrada por Rol, Estado, Prioridad, ║
-║       Cliente, Técnico o Atrasadas.                                          ║
-║     • Entrega el Detalle, Historial, Evidencias y Métricas del Dashboard.    ║
-║     • Expone las funciones de negocio para los botones de cada perfil.       ║
+║  [ ] Prueba: generarCodigoUnico() cumple el formato SOL-YYYY-XXXX            ║
+║  [ ] Prueba: calcularSlaFechaLimite() suma 6 / 24 / 72 / 168 horas           ║
+║  [ ] Prueba: el mensaje de WhatsApp incluye código y enlace de seguimiento   ║
+║  [ ] Prueba: EvidenciaRepository rechaza archivos de más de 5 MB             ║
+║  [ ] Revisar los 40 criterios del caso en el emulador                        ║
+║  [ ] Generar APK firmado (release)                                           ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║ 🟦 RECUADRO C: FASE 5 - PANTALLAS EN JETPACK COMPOSE (Interfaz Material 3)   ║
+║ 🔧 DEUDA TÉCNICA CONOCIDA                                     (opcional)     ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  En la carpeta `ui/view/` se construirán las 5 pantallas del flujo:          ║
-║                                                                              ║
-║  📄 1. LoginScreen.kt                                                        ║
-║     • Login tradicional + 3 tarjetas de "Acceso Rápido Ficticio"             ║
-║       (Cliente, Administrador, Técnico).                                     ║
-║                                                                              ║
-║  📄 2. BandejaScreen.kt                                                      ║
-║     • Buscador por código (`SOL-2026-XXXX`), chips de filtro y tarjetas      ║
-║       con diferenciación visual por color según el estado.                   ║
-║                                                                              ║
-║  📄 3. CrearSolicitudScreen.kt                                               ║
-║     • Formulario de Título, Descripción, Categoría, Servicio y Evidencia     ║
-║       ficticia + Botón "Guardar Borrador" y "Enviar Solicitud".              ║
-║                                                                              ║
-║  📄 4. DetalleSolicitudScreen.kt                                             ║
-║     • Ficha completa + Botón de WhatsApp con animación de envío + Panel de   ║
-║       acciones exclusivo según el Rol activo + Línea de tiempo del Historial.║
-║                                                                              ║
-║  📄 5. AdminDashboardScreen.kt                                               ║
-║     • Panel de resumen administrativo con contadores en tiempo real.         ║
-║                                                                              ║
-║  📄 6. MainActivity.kt                                                       ║
-║     • Punto de entrada que conecta la navegación entre las 5 pantallas.      ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-╔══════════════════════════════════════════════════════════════════════════════╗
-║ 🟩 RECUADRO D: FASE 6 - PRUEBAS UNITARIAS Y APK RELEASE                      ║
-╠══════════════════════════════════════════════════════════════════════════════╣
-║                                                                              ║
-║  📄 Archivo: app/src/test/java/com/example/gsm/ExampleUnitTest.kt            ║
-║  🎯 ¿Qué valida?                                                             ║
-║     • Test 1: Que `generarCodigoUnico()` cumpla el formato `SOL-YYYY-XXXX`.  ║
-║     • Test 2: Que `calcularSlaFechaLimite()` calcule 6h, 24h, 72h y 168h.    ║
-║     • Test 3: Que `crearMensajeEstructurado()` incluya código y seguimiento. ║
-║     • Test 4: Que `EvidenciaRepository` rechace archivos > 5 MB o inválidos. ║
+║  [ ] model/Usuario.kt todavía tiene el campo `password`. Lo ideal es que     ║
+║      solo exista en UsuarioEntity y nunca llegue a la pantalla.              ║
+║  [ ] model/SolicitudModels.kt declara el paquete data.local.model pero está  ║
+║      guardado en la carpeta model/. Funciona, pero confunde.                 ║
+║  [ ] Las contraseñas de prueba se guardan en texto plano (aceptable solo     ║
+║      porque son ficticias y es un proyecto académico).                       ║
+║  [ ] generarCodigoUnico() usa un número aleatorio; podría repetirse.         ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
 ---
 
-## 💾 7. Modelo de Datos Relacional (Room Schema)
+## 🚀 12. Cómo ejecutar el proyecto
+
+### Lo que necesitas instalar
+
+| Herramienta | Versión |
+| :--- | :--- |
+| Android Studio | Ladybug (2024.2) o más nueva |
+| JDK | 11 o 17 (viene incluido en Android Studio) |
+| Emulador o teléfono | Android 13 (API 33) o superior |
+
+### Pasos
+
+1. **Clona el repositorio**
+   ```bash
+   git clone <url-del-repositorio>
+   ```
+2. **Ábrelo en Android Studio:** *File → Open →* carpeta `GSM`.
+3. **Espera la sincronización de Gradle** (la barra de abajo debe terminar sin errores).
+4. **Crea un emulador** si no tienes: *Device Manager → Create Device →* elige un teléfono con API 33 o más.
+5. **Presiona ▶️ Run.**
+
+O desde la terminal:
+```bash
+./gradlew assembleDebug
+```
+
+> ℹ️ Mientras la Fase 5 no esté lista, la app mostrará la plantilla `"Hello Android!"`. Es normal.
+
+---
+
+## 🤝 13. Cómo aportar al proyecto (guía para nuevos desarrolladores)
+
+### 🧭 ¿Por dónde empiezo a leer el código?
+
+Lee en este orden. Cada paso usa lo que aprendiste en el anterior:
+
+```text
+  1️⃣  model/EstadoSolicitud.kt, RolUsuario.kt      ← Las opciones posibles
+        │
+  2️⃣  model/Solicitud.kt, Usuario.kt                ← Cómo se ve una solicitud
+        │
+  3️⃣  data/local/entity/SolicitudEntity.kt          ← Cómo se guarda en SQLite
+        │
+  4️⃣  data/mapper/SolicitudMapper.kt                ← Cómo se traduce de una a otra
+        │
+  5️⃣  data/local/dao/SolicitudDao.kt                ← Las consultas SQL
+        │
+  6️⃣  data/repository/GsmRepository.kt              ← Las reglas del negocio
+        │
+  7️⃣  ui/viewmodel/AuthViewModel.kt                 ← El ViewModel más simple
+        │
+  8️⃣  ui/viewmodel/DetalleSolicitudViewModel.kt     ← El ViewModel más completo
+```
+
+### 🛠️ Receta: ¿cómo agrego una función nueva?
+
+Supongamos que quieres agregar **"marcar solicitud como favorita"**:
+
+| Paso | Archivo | Qué haces |
+| :---: | :--- | :--- |
+| 1 | `SolicitudEntity.kt` | Agregas la columna `val esFavorita: Boolean = false` |
+| 2 | `Solicitud.kt` | Agregas el mismo campo en el modelo |
+| 3 | `SolicitudMapper.kt` | Lo copias en `toDomain()` y `toEntity()` |
+| 4 | `SolicitudDao.kt` | Agregas `@Query("UPDATE solicitudes SET esFavorita = :fav WHERE id = :id")` |
+| 5 | `SolicitudLocalRepository.kt` | Agregas una función que llama al DAO |
+| 6 | `GsmRepository.kt` | Agregas la función con su validación de rol (`require`) |
+| 7 | `DetalleSolicitudViewModel.kt` | Agregas un botón usando `ejecutarCambio(...)` |
+| 8 | `GsmDatabase.kt` | Subes `version = 1` a `version = 2` (cambió la tabla) |
+
+> ⚠️ **Si cambias una tabla (Entity), tienes que subir la versión de la base de datos.** Si no, la app se cerrará al abrir. En desarrollo basta con desinstalar la app del emulador.
+
+### 📏 Reglas del equipo
+
+| ✅ Haz esto | ❌ Evita esto |
+| :--- | :--- |
+| Escribir nombres en español y claros (`asignarTecnico`) | Nombres como `fn1`, `doStuff`, `x` |
+| Poner las reglas de negocio en el Repository | Poner reglas dentro de la pantalla |
+| Validar el rol con `require(...)` en cada acción nueva | Confiar en que "el botón está escondido" |
+| Usar `private set` en las variables del ViewModel | Dejar que la pantalla cambie variables del ViewModel |
+| Usar solo datos ficticios | Subir correos, teléfonos o RUT reales |
+| Probar en el emulador antes de subir | Subir código que no compila |
+
+### 🌿 Flujo de trabajo con Git
+
+```bash
+# 1. Actualiza tu copia
+git pull origin main
+
+# 2. Crea una rama para tu cambio
+git checkout -b feature/nombre-del-cambio
+
+# 3. Trabaja y guarda tus cambios
+git add .
+git commit -m "feat: agrega botón para marcar favoritas"
+
+# 4. Sube tu rama
+git push origin feature/nombre-del-cambio
+
+# 5. Abre un Pull Request en GitHub para que el equipo lo revise
+```
+
+**Prefijos para los mensajes de commit:**
+
+| Prefijo | Cuándo usarlo | Ejemplo |
+| :--- | :--- | :--- |
+| `feat:` | Algo nuevo | `feat: pantalla de login` |
+| `fix:` | Arreglar un error | `fix: filtro de atrasadas no funcionaba` |
+| `docs:` | Cambios en documentación | `docs: actualiza README` |
+| `refactor:` | Reordenar sin cambiar lo que hace | `refactor: separa GsmViewModel en 4` |
+| `test:` | Pruebas | `test: valida formato del código` |
+
+---
+
+## 💾 14. Modelo de datos
 
 ```mermaid
 erDiagram
-    USUARIOS ||--o{ SOLICITUDES : "clienteId (1:N)"
-    USUARIOS ||--o{ SOLICITUDES : "tecnicoId (1:N)"
-    SOLICITUDES ||--o{ HISTORIAL : "solicitudId (CASCADE)"
-    USUARIOS ||--o{ HISTORIAL : "usuarioId (RESTRICT)"
-    SOLICITUDES ||--o{ EVIDENCIAS : "solicitudId (CASCADE)"
-    USUARIOS ||--o{ EVIDENCIAS : "usuarioId (RESTRICT)"
-    SOLICITUDES ||--o{ NOTIFICACIONES : "solicitudId (CASCADE)"
-    USUARIOS ||--o{ NOTIFICACIONES : "usuarioDestinoId (CASCADE)"
+    USUARIOS ||--o{ SOLICITUDES : "es cliente de"
+    USUARIOS ||--o{ SOLICITUDES : "es técnico de"
+    SOLICITUDES ||--o{ HISTORIAL : "tiene"
+    USUARIOS ||--o{ HISTORIAL : "registra"
+    SOLICITUDES ||--o{ EVIDENCIAS : "tiene"
+    USUARIOS ||--o{ EVIDENCIAS : "sube"
+    SOLICITUDES ||--o{ NOTIFICACIONES : "genera"
+    USUARIOS ||--o{ NOTIFICACIONES : "recibe"
 
     USUARIOS {
         int id PK
@@ -400,8 +737,6 @@ erDiagram
         string rol
         string empresa
         string telefono
-        string medioContacto
-        string serviciosAsociados
         boolean activo
     }
 
@@ -415,16 +750,10 @@ erDiagram
         int tecnicoId FK
         string estado
         string prioridad
-        string servicioRelacionado
-        string activoRelacionado
         string resolucion
-        string motivoCancelacion
-        string motivoReapertura
-        boolean conformidadCliente
         boolean esBorrador
         long fechaLimite
         long fechaCreacion
-        long fechaActualizacion
     }
 
     HISTORIAL {
@@ -435,9 +764,7 @@ erDiagram
         string estadoNuevo
         string accion
         string comentario
-        string perfilUsuario
         boolean esComentarioInterno
-        string evidenciaAdjunta
         long fechaCambio
     }
 
@@ -448,10 +775,7 @@ erDiagram
         string nombreArchivo
         string tipoArchivo
         long tamanoBytes
-        string uriLocal
-        string descripcion
         string estadoRevision
-        long fechaIncorporacion
     }
 
     NOTIFICACIONES {
@@ -460,123 +784,107 @@ erDiagram
         int solicitudId FK
         string titulo
         string mensaje
-        string tipoEvento
         boolean leida
-        long fechaCreacion
     }
 ```
 
----
-
-## 📂 8. Estructura del Código Fuente
-
-```text
-GSM/
-├── app/
-│   ├── build.gradle.kts                   # Configuración de dependencias Android, Compose y KSP
-│   └── src/
-│       ├── main/
-│       │   ├── AndroidManifest.xml
-│       │   ├── java/com/example/gsm/
-│       │   │   ├── MainActivity.kt        # Actividad principal (Compose Entrypoint)
-│       │   │   ├── model/                 # Modelos de Dominio y Enums puros ("El Plato Limpio")
-│       │   │   │   ├── CategoriaSolicitud.kt
-│       │   │   │   ├── EstadoSolicitud.kt
-│       │   │   │   ├── PrioridadSolicitud.kt
-│       │   │   │   ├── RolUsuario.kt
-│       │   │   │   ├── Solicitud.kt
-│       │   │   │   ├── Usuario.kt
-│       │   │   │   ├── Historial.kt
-│       │   │   │   └── SolicitudModels.kt # DTOs relacionales (@Relation)
-│       │   │   ├── data/
-│       │   │   │   ├── local/             # Persistencia local con Room ("La Bodega")
-│       │   │   │   │   ├── GsmDatabase.kt
-│       │   │   │   │   ├── dao/           # Data Access Objects ("El Bodeguero")
-│       │   │   │   │   │   ├── SolicitudDao.kt
-│       │   │   │   │   │   ├── UsuarioDao.kt
-│       │   │   │   │   │   ├── HistorialDao.kt
-│       │   │   │   │   │   ├── EvidenciaDao.kt
-│       │   │   │   │   │   └── NotificacionDao.kt
-│       │   │   │   │   └── entity/        # Entidades mapeadas a SQLite ("Las Cajas")
-│       │   │   │   │       ├── SolicitudEntity.kt
-│       │   │   │   │       ├── UsuarioEntity.kt
-│       │   │   │   │       ├── HistorialEntity.kt
-│       │   │   │   │       ├── EvidenciaEntity.kt
-│       │   │   │   │       └── NotificacionEntity.kt
-│       │   │   │   ├── mapper/            # Mappers de aislamiento MVVM ("El Traductor")
-│       │   │   │   │   ├── SolicitudMapper.kt
-│       │   │   │   │   ├── UsuarioMapper.kt
-│       │   │   │   │   └── HistorialMapper.kt
-│       │   │   │   └── repository/        # Repositorios ("El Jefe de Cocina")
-│       │   │   │       ├── GsmRepository.kt            # Coordinador principal + RBAC
-│       │   │   │       ├── SolicitudLocalRepository.kt # CRUD Solicitudes, Código y SLA
-│       │   │   │       ├── UsuarioRepository.kt        # Autenticación y Perfiles
-│       │   │   │       ├── HistorialRepository.kt      # Auditoría y privacidad
-│       │   │   │       ├── EvidenciaRepository.kt      # Validación OWASP de adjuntos
-│       │   │   │       ├── NotificacionRepository.kt   # Alertas locales
-│       │   │   │       └── WhatsAppRepository.kt       # Formato estructurado y simulación
-│       │   │   └── ui/
-│       │   │       ├── theme/             # Material 3 ColorScheme, Tipografía y Tema
-│       │   │       ├── view/              # Pantallas y componentes Compose (Fase 5)
-│       │   │       └── viewmodel/         # ViewModels de Presentación (Fase 4)
-│       │   └── res/                       # Recursos XML, Drawables, Mipmaps
-│       └── test/                          # Pruebas unitarias (Fase 6)
-├── gradle/
-│   └── libs.versions.toml                 # Version Catalog centralizado
-├── build.gradle.kts                       # Configuración de compilación raíz
-└── README.md                              # Documentación maestra del proyecto
-```
+**¿Cómo se lee esto?** Un usuario puede tener muchas solicitudes. Una solicitud puede tener muchos registros de historial, muchas evidencias y muchas notificaciones. Si se borra una solicitud, se borran en cascada su historial, evidencias y notificaciones.
 
 ---
 
-## 📲 9. Integración y Simulación con WhatsApp
+## 📲 15. Integración con WhatsApp
 
-Conforme a las secciones **3.4 y 5.1** del documento de caso:
-* **Fuera de alcance:** No se utilizan APIs de pago (WhatsApp Business Platform), credenciales reales, lectura de chats reales ni datos personales.
-* **Mensaje Estructurado Oficial (`WhatsAppRepository.kt`):**
-  ```text
-  🔔 *SOLICITUD DE ASISTENCIA GSM*
-  ----------------------------------
-  📌 *Código:* SOL-2026-4821
-  📝 *Título:* Caída en servidor de base de datos
-  🏷️ *Categoría:* Incidente técnico
-  👤 *Cliente (Ficticio):* Pyme Soluciones Alfa
-  ⚡ *Prioridad:* ALTA
-  🔗 *Seguimiento:* https://gsm-soporte.cl/seguimiento/SOL-2026-4821
-  ----------------------------------
-  Puedes consultar el estado en la app GSM con tu código único.
-  ```
-* **Simulación Asíncrona (`simularEnvio`):** Genera un retardo controlado (`delay(1200L)`) para disparar una confirmación visual en la interfaz o compartir el texto mediante un `Intent` nativo de Android.
+Según el caso, **no** usamos la API pagada de WhatsApp Business ni leemos chats reales. Lo que hace la app:
 
----
-
-## 🚀 10. Requisitos de Ejecución y Compilación
-
-1. **Android Studio:** Ladybug (2024.2+) o posterior.
-2. **JDK:** Java Development Kit 11 o 17 (JBR incluido en Android Studio).
-3. **Dispositivo / Emulador:** Android 13.0 (API 33) a Android 16+ (API 37).
-4. **Compilar desde la terminal:**
-   ```bash
-   ./gradlew assembleDebug
+1. **Arma un mensaje ordenado** (`WhatsAppRepository.crearMensajeEstructurado`):
+   ```text
+   🔔 *SOLICITUD DE ASISTENCIA GSM*
+   ----------------------------------
+   📌 *Código:* SOL-2026-1001
+   📝 *Título:* Error 500 al subir catálogo en sitio web
+   🏷️ *Categoría:* Incidente técnico
+   ⚡ *Prioridad:* ALTA
+   🔗 *Seguimiento:* https://gsm-soporte.cl/seguimiento/SOL-2026-1001
+   ----------------------------------
+   Puedes consultar el estado en la app GSM con tu código único.
    ```
+2. **Simula el envío** (`simularEnvio`): espera 1,2 segundos para mostrar una animación de "Enviado".
 
 ---
 
-## 📋 11. Checklist de los 40 Criterios de Éxito del Caso (Págs. 13 y 14 del PDF)
+## ✅ 16. Checklist de criterios del caso
 
-* [x] **01 - 06:** Creación de solicitud con título, descripción, categoría, evidencia ficticia, código único (`SOL-YYYY-XXXX`), fecha/hora y estado inicial `"RECIBIDA"`.
-* [x] **07 - 08:** Mensaje estructurado para WhatsApp con código y referencia de seguimiento (`https://gsm-soporte.cl/seguimiento/...`).
-* [x] **09 - 11:** Consulta de estado vigente, última actualización e historial cronológico filtrado por rol.
-* [x] **12 - 16:** Consulta de solicitudes nuevas, clasificación administrativa, definición de prioridad, asignación de técnico y registro en historial.
-* [x] **17 - 21:** Bandeja de solicitudes asignadas al técnico, registro de avances, comentarios (públicos e internos), actualización de estado y conservación de fecha/usuario.
-* [x] **22 - 27:** Identificación de solicitudes pendientes de información y atrasadas (SLA) + filtros por estado, prioridad, cliente y responsable.
-* [x] **28 - 30:** Notificaciones locales/simuladas y resumen administrativo por estado consistente con los registros almacenados en Room.
-* [x] **31 - 34:** Registro de resolución técnica, confirmación de conformidad del cliente, solicitud de reapertura y registro del cierre en el historial.
-* [x] **35 - 40:** Demostración 100% funcional sin depender de servidor remoto, restricción de acciones por perfil (RBAC), datos exclusivamente ficticios y sin credenciales reales de WhatsApp.
+| Criterios | Tema | Lógica | Pantalla |
+| :--- | :--- | :---: | :---: |
+| 01 – 06 | Crear solicitud con código, fecha y estado inicial | ✅ | ⏳ |
+| 07 – 08 | Mensaje para WhatsApp con código y seguimiento | ✅ | ⏳ |
+| 09 – 11 | Ver estado, última actualización e historial | ✅ | ⏳ |
+| 12 – 16 | Clasificar, priorizar, asignar técnico y registrar | ✅ | ⏳ |
+| 17 – 21 | Bandeja del técnico, avances y comentarios | ✅ | ⏳ |
+| 22 – 27 | Pendientes de información, atrasadas y filtros | ✅ | ⏳ |
+| 28 – 30 | Notificaciones y métricas | ✅ | ⏳ |
+| 31 – 34 | Solución, conformidad, reapertura y cierre | ✅ | ⏳ |
+| 35 – 40 | Sin servidor, control por rol y datos ficticios | ✅ | ⏳ |
+
+> **Lógica ✅** = ya está programado en Repositorios y ViewModels. **Pantalla ⏳** = falta que el usuario lo pueda usar (Fase 5).
 
 ---
 
-## 👨‍💻 Créditos y Autoría
-* **Proyecto:** GSM - Gestión Móvil y Seguimiento de Solicitudes de Clientes
-* **Sede:** Duoc UC Puente Alto - CITT
-* **Asignatura:** DSY1105 - Desarrollo de Aplicaciones Móviles
+## ❓ 17. Preguntas frecuentes
+
+<details>
+<summary><b>¿Por qué hay "Entity" y "Model" si son casi iguales?</b></summary>
+
+`SolicitudEntity` está pensada para la base de datos (guarda el estado como `String`). `Solicitud` está pensada para la app (usa el `enum EstadoSolicitud`). Separarlas evita que un cambio en la base de datos rompa las pantallas.
+</details>
+
+<details>
+<summary><b>¿Por qué no se llama al DAO directamente desde el ViewModel?</b></summary>
+
+Porque las reglas (quién puede hacer qué, qué se anota en el historial, a quién se notifica) viven en el Repository. Si el ViewModel saltara directo al DAO, se saltaría la seguridad.
+</details>
+
+<details>
+<summary><b>¿Qué pasa si cierro la app? ¿Se pierde todo?</b></summary>
+
+No. Room guarda todo en un archivo SQLite dentro del teléfono (`gsm_database.db`). Solo se borra si desinstalas la app o borras sus datos.
+</details>
+
+<details>
+<summary><b>¿Por qué los ViewModels usan mutableStateOf y no StateFlow?</b></summary>
+
+Porque es más fácil de leer y explicar: se cambia una variable con `=` y la pantalla se actualiza sola. `StateFlow` es más robusto para apps grandes, y migrar a él queda como mejora futura.
+</details>
+
+<details>
+<summary><b>La app se cierra apenas la abro después de cambiar una Entity, ¿qué hago?</b></summary>
+
+Cambiaste la estructura de una tabla. Desinstala la app del emulador y vuelve a ejecutarla, o sube el número de `version` en `GsmDatabase`.
+</details>
+
+<details>
+<summary><b>¿Dónde cambio cuánto tiempo tiene cada prioridad?</b></summary>
+
+En `SolicitudLocalRepository.calcularSlaFechaLimite()`.
+</details>
+
+---
+
+## 👩‍💻👨‍💻 18. Autores
+
+<div align="center">
+
+| | Nombre | Rol en el proyecto |
+| :---: | :--- | :--- |
+| 👩‍💻 | **Elizabeth Reyes** | Desarrolladora |
+| 👨‍💻 | **Juan Varas** | Desarrollador |
+
+**Asignatura:** DSY1105 - Desarrollo de Aplicaciones Móviles
+**Institución:** Duoc UC · Sede Puente Alto · CITT
+**Año:** 2026
+
+---
+
+*Hecho con 💜 en Kotlin y Jetpack Compose.*
+
+</div>
