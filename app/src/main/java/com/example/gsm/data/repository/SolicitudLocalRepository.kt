@@ -6,7 +6,6 @@ import com.example.gsm.data.mapper.toDomain
 import com.example.gsm.data.mapper.toEntity
 import com.example.gsm.model.CategoriaSolicitud
 import com.example.gsm.model.EstadoSolicitud
-import com.example.gsm.data.mapper.toDomain
 import com.example.gsm.model.PrioridadSolicitud
 import com.example.gsm.model.Solicitud
 import kotlinx.coroutines.flow.Flow
@@ -67,6 +66,22 @@ class SolicitudLocalRepository(
     // --- Métodos de actualización de estado atómico ---
     suspend fun actualizarEstado(id: Int, nuevoEstado: EstadoSolicitud, ahora: Long) {
         solicitudDao.actualizarEstado(id, nuevoEstado.name, ahora)
+    }
+
+    suspend fun clasificarYPriorizar(
+        id: Int,
+        categoria: CategoriaSolicitud,
+        prioridad: PrioridadSolicitud,
+        ahora: Long
+    ) {
+        val nuevaFechaLimite = calcularSlaFechaLimite(prioridad, ahora)
+        solicitudDao.clasificarYPriorizar(
+            solicitudId = id,
+            categoria = categoria.name,
+            prioridad = prioridad.name,
+            nuevaFechaLimite = nuevaFechaLimite,
+            ts = ahora
+        )
     }
 
     suspend fun asignarTecnico(id: Int, tecnicoId: Int, ahora: Long) {

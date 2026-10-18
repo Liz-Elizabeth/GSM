@@ -106,6 +106,25 @@ interface SolicitudDao {
 
     // ---------- Cambios de estado ----------
 
+    @Query(
+        """
+        UPDATE solicitudes 
+        SET categoria = :categoria, 
+            prioridad = :prioridad, 
+            fechaLimite = :nuevaFechaLimite, 
+            estado = 'EN_REVISION', 
+            fechaActualizacion = :ts 
+        WHERE id = :solicitudId
+        """
+    )
+    suspend fun clasificarYPriorizar(
+        solicitudId: Int,
+        categoria: String,
+        prioridad: String,
+        nuevaFechaLimite: Long,
+        ts: Long = System.currentTimeMillis()
+    )
+
     @Query("UPDATE solicitudes SET tecnicoId = :tecnicoId, estado = 'ASIGNADA', fechaActualizacion = :ts WHERE id = :solicitudId")
     suspend fun asignarTecnico(solicitudId: Int, tecnicoId: Int, ts: Long = System.currentTimeMillis())
 

@@ -3,28 +3,29 @@ package com.example.gsm.data.repository
 import com.example.gsm.model.Solicitud
 import kotlinx.coroutines.delay
 
-
 /**
- * Construye el mensaje estructurado formal sin exponer datos sensibles.
+ * Construye el mensaje estructurado formal sin exponer datos sensibles (PDF Pág. 13).
  */
 class WhatsAppRepository {
 
     /**
-     * Construye el mensaje estructurado formal sin exponer datos sensibles.
+     * Construye el mensaje estructurado con código, título, categoría y referencia de seguimiento
+     * (Cumple Criterios 7, 8, 38 y 39 del PDF).
      */
     fun crearMensajeEstructurado(solicitud: Solicitud, nombreCliente: String? = null): String {
         return buildString {
-            appendLine(" *SOLICITUD DE ASISTENCIA GSM*")
+            appendLine("🔔 *SOLICITUD DE ASISTENCIA GSM*")
             appendLine("----------------------------------")
-            appendLine(" *Código:* ${solicitud.codigoSeguimiento}")
-            appendLine(" *Título:* ${solicitud.titulo}")
-            appendLine("️ *Categoría:* ${solicitud.categoria.descripcion}")
+            appendLine("📌 *Código:* ${solicitud.codigoSeguimiento}")
+            appendLine("📝 *Título:* ${solicitud.titulo}")
+            appendLine("🏷️ *Categoría:* ${solicitud.categoria.descripcion}")
             if (!nombreCliente.isNullOrBlank()) {
-                appendLine(" *Cliente:* $nombreCliente")
+                appendLine("👤 *Cliente (Ficticio):* $nombreCliente")
             }
-            appendLine(" *Prioridad:* ${solicitud.prioridad.name}")
+            appendLine("⚡ *Prioridad:* ${solicitud.prioridad.name}")
+            appendLine("🔗 *Seguimiento:* https://gsm-soporte.cl/seguimiento/${solicitud.codigoSeguimiento}")
             appendLine("----------------------------------")
-            appendLine(" Puedes seguir el estado en la app GSM.")
+            appendLine("Puedes consultar el estado en la app GSM con tu código único.")
         }
     }
 
