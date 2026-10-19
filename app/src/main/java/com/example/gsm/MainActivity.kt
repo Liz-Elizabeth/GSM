@@ -7,41 +7,51 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.ViewModelProvider
+import com.example.gsm.data.local.GsmDatabase
+import com.example.gsm.data.repository.*
 import com.example.gsm.ui.theme.GSMTheme
+import com.example.gsm.ui.view.navigation.AppNavigation
+import com.example.gsm.ui.viewmodel.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // 1. Inicializamos Base de Datos Room (con datos ficticios automáticos)
+        val db = GsmDatabase.getInstance(applicationContext)
+
+        // 2. Inicializamos los Repositorios
+        val usuarioRepo = UsuarioRepository(db.usuarioDao())
+        val gsmRepo = GsmRepository(
+            localRepo = SolicitudLocalRepository(db.solicitudDao()),
+            historialRepo = HistorialRepository(db.historialDao()),
+            notificacionRepo = NotificacionRepository(db.notificacionDao()),
+            whatsAppRepo = WhatsAppRepository(),
+            evidenciaRepo = EvidenciaRepository(db.evidenciaDao())
+        )
+
+        // 3. Creamos los 4 ViewModels usando nuestra fábrica manual
+        val factory = GsmViewModelFactory(gsmRepo, usuarioRepo)
+        val authVm = ViewModelProvider(this, factory)[AuthViewModel::class.java]
+        val solicitudVm = ViewModelProvider(this, factory)[SolicitudViewModel::class.java]
+        val detalleVm = ViewModelProvider(this, factory)[DetalleSolicitudViewModel::class.java]
+        val dashboardVm = ViewModelProvider(this, factory)[AdminDashboardViewModel::class.java]
+
         setContent {
             GSMTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
+                    AppNavigation(
+                        authVm = authVm,
+                        solicitudVm = solicitudVm,
+                        detalleVm = detalleVm,
+                        dashboardVm = dashboardVm,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    GSMTheme {
-        Greeting("Android")
     }
 }

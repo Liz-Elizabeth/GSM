@@ -79,9 +79,9 @@ GSM es una app Android que:
 ║  FASE 2  Traductores (Mappers)               [██████████] 100%  ✅ LISTO     ║
 ║  FASE 3  Repositorios y reglas de negocio    [██████████] 100%  ✅ LISTO     ║
 ║  FASE 4  ViewModels + Datos de prueba        [██████████] 100%  ✅ LISTO     ║
+║  FASE 5  Pantallas y Navegación (Compose)    [██████████] 100%  ✅ LISTO     ║
 ║  ──────────────────────────────────────────────────────────────────────────  ║
-║  FASE 5  Pantallas (Jetpack Compose)         [░░░░░░░░░░]   0%  📍 SIGUIENTE ║
-║  FASE 6  Pruebas unitarias y APK final       [░░░░░░░░░░]   0%  ⏳ PENDIENTE ║
+║  FASE 6  Funciones nativas y Pruebas         [░░░░░░░░░░]   0%  📍 SIGUIENTE ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
@@ -91,11 +91,11 @@ GSM es una app Android que:
 | **1. Base de datos** | 5 tablas (`Usuario`, `Solicitud`, `Historial`, `Evidencia`, `Notificacion`) y 5 DAOs | 🟢 Listo |
 | **2. Mappers** | `SolicitudMapper`, `UsuarioMapper`, `HistorialMapper` | 🟢 Listo |
 | **3. Repositorios** | `GsmRepository` + 6 sub-repositorios con validaciones de seguridad por rol | 🟢 Listo |
-| **4. ViewModels** | `AuthViewModel`, `SolicitudViewModel`, `DetalleSolicitudViewModel`, `AdminDashboardViewModel` + datos ficticios en `GsmDatabase` | 🟢 Listo |
-| **5. Pantallas** | Login, Bandeja, Crear, Detalle, Dashboard y navegación en `MainActivity` | 📍 Siguiente |
-| **6. Calidad** | Pruebas unitarias, revisión de los 40 criterios y APK firmado | ⏳ Pendiente |
+| **4. ViewModels** | `AuthViewModel`, `SolicitudViewModel`, `DetalleSolicitudViewModel`, `AdminDashboardViewModel` + `GsmViewModelFactory` | 🟢 Listo |
+| **5. Pantallas** | `components/`, `navigation/` y `screens/` (`auth`, `usuario`, `admin`) conectadas en `MainActivity` | 🟢 Listo |
+| **6. Nativas y Calidad** | Cámara nativa, selector de archivos del dispositivo, pruebas unitarias y APK firmado | 📍 Siguiente |
 
-> ⚠️ **Importante para quien llegue nuevo:** hoy `MainActivity.kt` todavía muestra la plantilla `"Hello Android!"`. La lógica ya existe, pero **todavía no hay pantallas conectadas**. Eso es exactamente la Fase 5.
+> ✅ **Estado actual:** La aplicación ya es 100% navegable y funcional en el emulador con los 3 roles (`Cliente`, `Administrador`, `Técnico`).
 
 ---
 
@@ -164,7 +164,7 @@ GSM/
     ├── 📄 build.gradle.kts              ← Dependencias de la app (Compose, Room...)
     └── 📁 src/main/java/com/example/gsm/
         │
-        ├── 📄 MainActivity.kt           ← Punto de entrada (⏳ falta conectar pantallas)
+        ├── 📄 MainActivity.kt           ← Punto de entrada (✅ conectada a AppNavigation)
         │
         ├── 📁 model/                    ← 🍽️ "Platos limpios" (modelos de dominio)
         │   ├── Solicitud.kt
@@ -208,12 +208,27 @@ GSM/
         │
         └── 📁 ui/
             ├── 📁 theme/                ← Colores y tipografía
-            ├── 📁 viewmodel/            ← 🧑‍🍳 Meseros (✅ listos)
+            ├── 📁 viewmodel/            ← 🧑‍🍳 Meseros + Fábrica (✅ listos)
             │   ├── AuthViewModel.kt
             │   ├── SolicitudViewModel.kt
             │   ├── DetalleSolicitudViewModel.kt
-            │   └── AdminDashboardViewModel.kt
-            └── 📁 view/                 ← 📋 Pantallas (⏳ Fase 5)
+            │   ├── AdminDashboardViewModel.kt
+            │   └── GsmViewModelFactory.kt
+            └── 📁 view/                 ← 📋 Capa de Vistas (✅ Fase 5 lista)
+                ├── 📁 components/
+                │   ├── EncabezadoPantalla.kt
+                │   └── TarjetaSolicitudItem.kt
+                ├── 📁 navigation/
+                │   └── AppNavigation.kt
+                └── 📁 screens/
+                    ├── 📁 auth/
+                    │   └── LoginScreen.kt
+                    ├── 📁 usuario/
+                    │   ├── BandejaScreen.kt
+                    │   ├── CrearSolicitudScreen.kt
+                    │   └── DetalleSolicitudScreen.kt
+                    └── 📁 admin/
+                        └── AdminDashboardScreen.kt
 ```
 
 ---
@@ -270,8 +285,9 @@ flowchart TD
         TEC["🔧 Técnico"]
     end
 
-    subgraph UI ["📋 Pantallas - Fase 5"]
-        SCREENS["Login, Bandeja, Crear, Detalle, Dashboard"]
+    subgraph UI ["📋 Vistas - Fase 5"]
+        NAV["AppNavigation"]
+        SCREENS["auth / usuario / admin screens"]
     end
 
     subgraph VM ["🧑‍🍳 ViewModels - Fase 4"]
@@ -297,7 +313,8 @@ flowchart TD
         DB[("GsmDatabase")]
     end
 
-    CLI & ADM & TEC --> SCREENS
+    CLI & ADM & TEC --> NAV
+    NAV --> SCREENS
     SCREENS --> AUTH & SOL & DET & DASH
     AUTH --> USR
     DET --> USR
@@ -311,13 +328,17 @@ flowchart TD
 
 ### 5.3 ¿Qué ViewModel usa cada pantalla?
 
-| Pantalla (Fase 5) | ViewModel que usa | Para qué |
-| :--- | :--- | :--- |
-| `LoginScreen` | `AuthViewModel` | Iniciar sesión y botones de cuentas demo |
-| `BandejaScreen` | `SolicitudViewModel` | Ver la lista, buscar y filtrar |
-| `CrearSolicitudScreen` | `SolicitudViewModel` | Crear solicitud o guardar borrador |
-| `DetalleSolicitudScreen` | `DetalleSolicitudViewModel` | Ver detalle, historial y cambiar estados |
-| `AdminDashboardScreen` | `AdminDashboardViewModel` | Ver contadores en tiempo real |
+| Pantalla | Carpeta | ViewModel que usa | Para qué |
+| :--- | :--- | :--- | :--- |
+| `LoginScreen` | `screens/auth/` | `AuthViewModel` | Iniciar sesión y botones de cuentas demo |
+| `BandejaScreen` | `screens/usuario/` | `SolicitudViewModel` | Ver la lista, buscar y filtrar |
+| `CrearSolicitudScreen` | `screens/usuario/` | `SolicitudViewModel` | Crear solicitud o guardar borrador |
+| `DetalleSolicitudScreen` | `screens/usuario/` | `DetalleSolicitudViewModel` | Ver detalle, WhatsApp, historial y acciones por rol |
+| `AdminDashboardScreen` | `screens/admin/` | `AdminDashboardViewModel` | Ver contadores en tiempo real |
+
+**Componentes reutilizables (`components/`):** `EncabezadoPantalla` (título + botón Volver) y `TarjetaSolicitudItem` (tarjeta de la bandeja, se pinta roja si está atrasada).
+
+**Navegación (`navigation/AppNavigation.kt`):** si `usuarioActual == null` muestra el Login; si no, un `when (pantallaActual)` elige entre `"bandeja"`, `"crear"`, `"detalle"` y `"dashboard"` (KISS, sin librerías extra).
 
 ---
 
@@ -553,23 +574,39 @@ La primera vez que se abre la app, `GsmDatabase` revisa si está vacía. Si lo e
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║ 🟦 FASE 5 - PANTALLAS Y NAVEGACIÓN                         📍 SIGUIENTE PASO ║
+║ 🟦 FASE 5 - PANTALLAS, COMPONENTES Y NAVEGACIÓN               ✅ COMPLETADO  ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  [ ] 1. GsmViewModelFactory.kt                                               ║
-║        Los ViewModels reciben repositorios en el constructor, así que        ║
-║        Android necesita una "fábrica" que sepa cómo crearlos.                ║
+║  [x] 1. GsmViewModelFactory.kt (ui/viewmodel/)                               ║
+║  [x] 2. Componentes reutilizables (ui/view/components/):                     ║
+║         • EncabezadoPantalla.kt                                              ║
+║         • TarjetaSolicitudItem.kt                                            ║
+║  [x] 3. Controlador de navegación (ui/view/navigation/AppNavigation.kt)      ║
+║  [x] 4. Pantallas por perfil (ui/view/screens/):                             ║
+║         • auth/LoginScreen.kt                                                ║
+║         • usuario/BandejaScreen.kt                                           ║
+║         • usuario/CrearSolicitudScreen.kt                                    ║
+║         • usuario/DetalleSolicitudScreen.kt                                  ║
+║         • admin/AdminDashboardScreen.kt                                      ║
+║  [x] 5. MainActivity.kt conectada a Room, Repositorios y AppNavigation       ║
 ║                                                                              ║
-║  [ ] 2. LoginScreen.kt          → usa AuthViewModel                          ║
-║  [ ] 3. BandejaScreen.kt        → usa SolicitudViewModel                     ║
-║  [ ] 4. CrearSolicitudScreen.kt → usa SolicitudViewModel                     ║
-║  [ ] 5. DetalleSolicitudScreen.kt → usa DetalleSolicitudViewModel            ║
-║  [ ] 6. AdminDashboardScreen.kt → usa AdminDashboardViewModel                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ 📸 FUNCIONES NATIVAS DEL DISPOSITIVO (EVIDENCIAS REALES)      📍 PENDIENTE   ║
+╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  [ ] 7. MainActivity.kt                                                      ║
-║        Crear GsmDatabase + repositorios + fábrica y navegar entre            ║
-║        pantallas con una variable simple:                                    ║
-║        var pantallaActual by remember { mutableStateOf("login") }            ║
+║  [ ] 1. Uso de la Cámara Nativa para Evidencias:                             ║
+║        Integrar `ActivityResultContracts.TakePicture()` y `FileProvider`     ║
+║        para permitir que el usuario o técnico saque fotografías en vivo      ║
+║        con la cámara del teléfono y las adjunte directamente al ticket.      ║
+║                                                                              ║
+║  [ ] 2. Selector de Archivos del Dispositivo (File Picker):                  ║
+║        Integrar `ActivityResultContracts.OpenDocument()` / `GetContent()`    ║
+║        para seleccionar cualquier archivo almacenado en el teléfono          ║
+║        (PDF, imágenes JPG/PNG, TXT), leer su nombre, tipo MIME y tamaño      ║
+║        real mediante `ContentResolver` y cargarlo al ticket como evidencia   ║
+║        validada por `EvidenciaRepository` (máx. 5 MB).                       ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -629,7 +666,7 @@ O desde la terminal:
 ./gradlew assembleDebug
 ```
 
-> ℹ️ Mientras la Fase 5 no esté lista, la app mostrará la plantilla `"Hello Android!"`. Es normal.
+> ✅ Al abrir la app verás `LoginScreen` con los 3 botones de acceso rápido Demo (**Cliente**, **Administrador** y **Técnico**) listos para probar todos los flujos.
 
 ---
 
@@ -816,17 +853,19 @@ Según el caso, **no** usamos la API pagada de WhatsApp Business ni leemos chats
 
 | Criterios | Tema | Lógica | Pantalla |
 | :--- | :--- | :---: | :---: |
-| 01 – 06 | Crear solicitud con código, fecha y estado inicial | ✅ | ⏳ |
-| 07 – 08 | Mensaje para WhatsApp con código y seguimiento | ✅ | ⏳ |
-| 09 – 11 | Ver estado, última actualización e historial | ✅ | ⏳ |
-| 12 – 16 | Clasificar, priorizar, asignar técnico y registrar | ✅ | ⏳ |
-| 17 – 21 | Bandeja del técnico, avances y comentarios | ✅ | ⏳ |
-| 22 – 27 | Pendientes de información, atrasadas y filtros | ✅ | ⏳ |
-| 28 – 30 | Notificaciones y métricas | ✅ | ⏳ |
-| 31 – 34 | Solución, conformidad, reapertura y cierre | ✅ | ⏳ |
-| 35 – 40 | Sin servidor, control por rol y datos ficticios | ✅ | ⏳ |
+| 01 – 06 | Crear solicitud con código, fecha y estado inicial | ✅ | ✅ |
+| 07 – 08 | Mensaje para WhatsApp con código y seguimiento | ✅ | ✅ |
+| 09 – 11 | Ver estado, última actualización e historial | ✅ | ✅ |
+| 12 – 16 | Clasificar, priorizar, asignar técnico y registrar | ✅ | ✅ |
+| 17 – 21 | Bandeja del técnico, avances y comentarios | ✅ | ✅ |
+| 22 – 27 | Pendientes de información, atrasadas y filtros | ✅ | ✅ |
+| 28 – 30 | Notificaciones y métricas | ✅ | ✅ |
+| 31 – 34 | Solución, conformidad, reapertura y cierre | ✅ | ✅ |
+| 35 – 40 | Sin servidor, control por rol y datos ficticios | ✅ | ✅ |
+| Extra | Evidencia real: foto con cámara nativa y archivo del dispositivo | 🟡 | ⏳ |
 
-> **Lógica ✅** = ya está programado en Repositorios y ViewModels. **Pantalla ⏳** = falta que el usuario lo pueda usar (Fase 5).
+> **Lógica ✅ / Pantalla ✅** = programado y usable desde la app.
+> **Extra 🟡 / ⏳** = `EvidenciaRepository` ya valida formato y tamaño (5 MB), pero hoy la pantalla solo adjunta un archivo ficticio con un `Checkbox`. Falta conectar la **cámara** (`TakePicture`) y el **selector de archivos** (`OpenDocument`) — ver sección 11.
 
 ---
 
