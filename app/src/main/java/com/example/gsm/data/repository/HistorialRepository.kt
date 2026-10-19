@@ -3,8 +3,8 @@ package com.example.gsm.data.repository
 import com.example.gsm.data.local.dao.HistorialDao
 import com.example.gsm.data.local.entity.HistorialEntity
 import com.example.gsm.data.mapper.toDomain
-import com.example.gsm.model.Historial
-import com.example.gsm.model.RolUsuario
+import com.example.gsm.data.model.Historial
+import com.example.gsm.data.model.RolUsuario
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

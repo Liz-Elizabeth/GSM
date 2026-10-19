@@ -16,8 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.gsm.model.EstadoSolicitud
-import com.example.gsm.model.Solicitud
+import com.example.gsm.data.model.EstadoSolicitud
+import com.example.gsm.data.model.Solicitud
 
 /**
  * Componente reutilizable para mostrar una tarjeta de solicitud en la bandeja.

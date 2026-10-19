@@ -4,10 +4,10 @@ import com.example.gsm.data.local.dao.SolicitudDao
 import com.example.gsm.data.local.model.ConteoPorTecnicoDto
 import com.example.gsm.data.mapper.toDomain
 import com.example.gsm.data.mapper.toEntity
-import com.example.gsm.model.CategoriaSolicitud
-import com.example.gsm.model.EstadoSolicitud
-import com.example.gsm.model.PrioridadSolicitud
-import com.example.gsm.model.Solicitud
+import com.example.gsm.data.model.CategoriaSolicitud
+import com.example.gsm.data.model.EstadoSolicitud
+import com.example.gsm.data.model.PrioridadSolicitud
+import com.example.gsm.data.model.Solicitud
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat

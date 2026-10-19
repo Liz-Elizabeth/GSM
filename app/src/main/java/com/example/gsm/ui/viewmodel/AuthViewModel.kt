@@ -6,8 +6,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gsm.data.repository.UsuarioRepository
-import com.example.gsm.model.RolUsuario
-import com.example.gsm.model.Usuario
+import com.example.gsm.data.model.RolUsuario
+import com.example.gsm.data.model.Usuario
 import kotlinx.coroutines.launch
 
 class AuthViewModel(

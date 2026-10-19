@@ -1,8 +1,8 @@
 package com.example.gsm.data.mapper
 
 import com.example.gsm.data.local.entity.UsuarioEntity
-import com.example.gsm.model.RolUsuario
-import com.example.gsm.model.Usuario
+import com.example.gsm.data.model.RolUsuario
+import com.example.gsm.data.model.Usuario
 
 /**
  * Mapper exclusivo para Perfiles de Usuario y Autenticación.

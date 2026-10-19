@@ -1,4 +1,4 @@
-package com.example.gsm.model
+package com.example.gsm.data.model
 
 data class Usuario(
     val id: Int = 0,

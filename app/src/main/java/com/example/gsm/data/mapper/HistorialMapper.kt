@@ -1,9 +1,9 @@
 package com.example.gsm.data.mapper
 
 import com.example.gsm.data.local.entity.HistorialEntity
-import com.example.gsm.model.EstadoSolicitud
-import com.example.gsm.model.Historial
-import com.example.gsm.model.RolUsuario
+import com.example.gsm.data.model.EstadoSolicitud
+import com.example.gsm.data.model.Historial
+import com.example.gsm.data.model.RolUsuario
 
 /**
  * Mapper exclusivo para la Bitácora de Auditoría y Trazabilidad.

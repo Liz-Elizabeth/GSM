@@ -8,12 +8,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.gsm.data.local.entity.EvidenciaEntity
 import com.example.gsm.data.repository.GsmRepository
 import com.example.gsm.data.repository.UsuarioRepository
-import com.example.gsm.model.CategoriaSolicitud
-import com.example.gsm.model.Historial
-import com.example.gsm.model.PrioridadSolicitud
-import com.example.gsm.model.RolUsuario
-import com.example.gsm.model.Solicitud
-import com.example.gsm.model.Usuario
+import com.example.gsm.data.model.CategoriaSolicitud
+import com.example.gsm.data.model.Historial
+import com.example.gsm.data.model.PrioridadSolicitud
+import com.example.gsm.data.model.RolUsuario
+import com.example.gsm.data.model.Solicitud
+import com.example.gsm.data.model.Usuario
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 

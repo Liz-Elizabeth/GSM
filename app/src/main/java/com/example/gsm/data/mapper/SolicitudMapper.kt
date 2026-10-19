@@ -1,10 +1,10 @@
 package com.example.gsm.data.mapper
 
 import com.example.gsm.data.local.entity.SolicitudEntity
-import com.example.gsm.model.CategoriaSolicitud
-import com.example.gsm.model.EstadoSolicitud
-import com.example.gsm.model.PrioridadSolicitud
-import com.example.gsm.model.Solicitud
+import com.example.gsm.data.model.CategoriaSolicitud
+import com.example.gsm.data.model.EstadoSolicitud
+import com.example.gsm.data.model.PrioridadSolicitud
+import com.example.gsm.data.model.Solicitud
 
 /**
  * Mapper exclusivo para el ciclo de vida de Solicitudes.

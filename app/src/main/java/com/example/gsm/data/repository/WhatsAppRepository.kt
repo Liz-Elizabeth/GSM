@@ -1,6 +1,6 @@
 package com.example.gsm.data.repository
 
-import com.example.gsm.model.Solicitud
+import com.example.gsm.data.model.Solicitud
 import kotlinx.coroutines.delay
 
 /**

@@ -2,8 +2,8 @@ package com.example.gsm.data.repository
 
 import com.example.gsm.data.local.dao.UsuarioDao
 import com.example.gsm.data.mapper.toDomain
-import com.example.gsm.model.RolUsuario
-import com.example.gsm.model.Usuario
+import com.example.gsm.data.model.RolUsuario
+import com.example.gsm.data.model.Usuario
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

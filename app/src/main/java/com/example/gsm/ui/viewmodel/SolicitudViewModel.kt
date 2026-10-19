@@ -6,12 +6,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gsm.data.repository.GsmRepository
-import com.example.gsm.model.CategoriaSolicitud
-import com.example.gsm.model.EstadoSolicitud
-import com.example.gsm.model.PrioridadSolicitud
-import com.example.gsm.model.RolUsuario
-import com.example.gsm.model.Solicitud
-import com.example.gsm.model.Usuario
+import com.example.gsm.data.model.CategoriaSolicitud
+import com.example.gsm.data.model.EstadoSolicitud
+import com.example.gsm.data.model.PrioridadSolicitud
+import com.example.gsm.data.model.RolUsuario
+import com.example.gsm.data.model.Solicitud
+import com.example.gsm.data.model.Usuario
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 

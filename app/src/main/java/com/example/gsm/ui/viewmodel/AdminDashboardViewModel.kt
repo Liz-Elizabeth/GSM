@@ -7,8 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gsm.data.local.model.ConteoPorTecnicoDto
 import com.example.gsm.data.repository.GsmRepository
-import com.example.gsm.model.EstadoSolicitud
-import com.example.gsm.model.PrioridadSolicitud
+import com.example.gsm.data.model.EstadoSolicitud
+import com.example.gsm.data.model.PrioridadSolicitud
 import kotlinx.coroutines.launch
 
 class AdminDashboardViewModel(

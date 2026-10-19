@@ -1,4 +1,4 @@
-package com.example.gsm.model
+package com.example.gsm.data.model
 
 enum class CategoriaSolicitud(val descripcion: String) {
     DESARROLLO_WEB("Desarrollo web"),
