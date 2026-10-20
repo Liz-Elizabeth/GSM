@@ -21,9 +21,10 @@ import com.example.gsm.data.model.Usuario
 import com.example.gsm.ui.view.components.TarjetaSolicitudItem
 import com.example.gsm.ui.viewmodel.SolicitudViewModel
 
-// Paleta minimalista estilo iOS (System Grouped Background)
+// Paleta Apple + Teamwork (Fondo agrupado y acento corporativo)
 private val AppleBackground = Color(0xFFF2F2F7)
-private val AppleSearchFill = Color(0xFFE5E5EA)
+private val AppleInputFill = Color(0xFFF2F2F7)
+private val TeamworkBlue = Color(0xFF0066FF)
 
 @Composable
 fun BandejaScreen(
@@ -42,146 +43,226 @@ fun BandejaScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(AppleBackground)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        // 1. Encabezado limpio estilo iOS Large Title
+        // 1. HEADER ESTILO TEAMWORK + APPLE (Usuario + Badge de Rol + Salir)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = "Bandeja GSM",
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = "${usuario.nombre} • ${usuario.rol.name}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = usuario.nombre,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // Badge de Rol estilo Teamwork
+                    Surface(
+                        color = TeamworkBlue.copy(alpha = 0.12f),
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            text = usuario.rol.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TeamworkBlue,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
-            TextButton(onClick = alCerrarSesion) {
-                Text(
-                    text = "Salir",
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.SemiBold
-                )
+
+            FilledTonalButton(
+                onClick = alCerrarSesion,
+                shape = CircleShape,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text("Salir", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // 2. Acción principal con bordes suaves (12.dp)
-        if (usuario.rol == RolUsuario.CLIENTE || usuario.rol == RolUsuario.ADMINISTRADOR) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+        // 2. BARRA DE HERRAMIENTAS UNIFICADA (Acción + Buscador + Filtros en una sola tarjeta limpia)
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Botón de acción rápida según rol (Estilo Teamwork CTA)
                 if (usuario.rol == RolUsuario.CLIENTE) {
                     Button(
                         onClick = alIrACrear,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                            .fillMaxWidth()
+                            .height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = TeamworkBlue)
                     ) {
-                        Text("+ Nueva Solicitud", fontWeight = FontWeight.SemiBold)
+                        Text("＋ Nueva Solicitud", fontWeight = FontWeight.SemiBold)
                     }
-                }
-                if (usuario.rol == RolUsuario.ADMINISTRADOR) {
+                } else if (usuario.rol == RolUsuario.ADMINISTRADOR) {
                     Button(
                         onClick = alIrADashboard,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                            .fillMaxWidth()
+                            .height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = TeamworkBlue)
                     ) {
                         Text("📊 Panel de Métricas", fontWeight = FontWeight.SemiBold)
                     }
                 }
+
+                // Buscador Spotlight con botón '✕' para limpiar rápido
+                TextField(
+                    value = solicitudVm.textoBusqueda,
+                    onValueChange = { solicitudVm.cambiarTextoBusqueda(it, usuario) },
+                    placeholder = {
+                        Text(
+                            text = "🔍 Buscar código (SOL-2026...) o título",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    trailingIcon = {
+                        if (solicitudVm.textoBusqueda.isNotEmpty()) {
+                            TextButton(onClick = { solicitudVm.cambiarTextoBusqueda("", usuario) }) {
+                                Text("✕", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = AppleInputFill,
+                        unfocusedContainerColor = AppleInputFill,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Filtros tipo píldora (con nombres limpios sin guiones bajos)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilterChip(
+                        selected = solicitudVm.estadoFiltro == null && !solicitudVm.soloAtrasadas,
+                        onClick = { solicitudVm.cambiarFiltroEstado(null, usuario) },
+                        label = { Text("Todas") },
+                        shape = CircleShape,
+                        border = null
+                    )
+                    FilterChip(
+                        selected = solicitudVm.soloAtrasadas,
+                        onClick = {
+                            solicitudVm.cambiarFiltroAtrasadas(!solicitudVm.soloAtrasadas, usuario)
+                        },
+                        label = { Text("⚠️ Atrasadas") },
+                        shape = CircleShape,
+                        border = null
+                    )
+                    EstadoSolicitud.entries.forEach { estado ->
+                        FilterChip(
+                            selected = solicitudVm.estadoFiltro == estado,
+                            onClick = { solicitudVm.cambiarFiltroEstado(estado, usuario) },
+                            // Convierte "EN_PROCESO" -> "En proceso"
+                            label = {
+                                Text(
+                                    estado.name.replace("_", " ")
+                                        .lowercase()
+                                        .replaceFirstChar { it.uppercase() }
+                                )
+                            },
+                            shape = CircleShape,
+                            border = null
+                        )
+                    }
+                }
             }
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // 3. Buscador estilo Spotlight (relleno suave, sin bordes duros)
-        TextField(
-            value = solicitudVm.textoBusqueda,
-            onValueChange = { solicitudVm.cambiarTextoBusqueda(it, usuario) },
-            placeholder = {
-                Text(
-                    text = "🔍 Buscar por código (SOL-2026...) o título",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = AppleSearchFill,
-                unfocusedContainerColor = AppleSearchFill,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
+        Spacer(modifier = Modifier.height(14.dp))
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 4. Filtros rápidos tipo píldora (CircleShape y sin borde)
+        // 3. CABECERA DE COLA DE TICKETS (Contador en vivo estilo Teamwork)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            FilterChip(
-                selected = solicitudVm.estadoFiltro == null && !solicitudVm.soloAtrasadas,
-                onClick = { solicitudVm.cambiarFiltroEstado(null, usuario) },
-                label = { Text("Todas") },
-                shape = CircleShape,
-                border = null
+            Text(
+                text = "SOLICITUDES",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold
             )
-            FilterChip(
-                selected = solicitudVm.soloAtrasadas,
-                onClick = {
-                    solicitudVm.cambiarFiltroAtrasadas(!solicitudVm.soloAtrasadas, usuario)
-                },
-                label = { Text("⚠️ Atrasadas") },
-                shape = CircleShape,
-                border = null
+            Text(
+                text = "${solicitudVm.listaSolicitudes.size} resultados",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            EstadoSolicitud.entries.forEach { estado ->
-                FilterChip(
-                    selected = solicitudVm.estadoFiltro == estado,
-                    onClick = { solicitudVm.cambiarFiltroEstado(estado, usuario) },
-                    label = { Text(estado.name) },
-                    shape = CircleShape,
-                    border = null
-                )
-            }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // 5. Lista de solicitudes con espaciado respirable
+        // 4. LISTA DE SOLICITUDES O ESTADO VACÍO AMIGABLE
         if (solicitudVm.listaSolicitudes.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
-                Text(
-                    text = "No hay solicitudes para mostrar",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("📭", style = MaterialTheme.typography.displaySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Bandeja al día",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "No hay solicitudes que coincidan con este filtro.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 16.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
                 items(solicitudVm.listaSolicitudes) { solicitud ->
                     TarjetaSolicitudItem(
