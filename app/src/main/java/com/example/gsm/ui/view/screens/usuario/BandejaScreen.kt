@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gsm.data.model.EstadoSolicitud
+import com.example.gsm.data.model.PrioridadSolicitud
 import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.ui.view.components.TarjetaSolicitudItem
@@ -45,28 +46,25 @@ fun BandejaScreen(
             .background(AppleBackground)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        // 1. HEADER ESTILO TEAMWORK + APPLE (Usuario + Badge de Rol + Salir)
+        // 1. HEADER LIMPIO (Título + Badge RBAC en la primera línea, Nombre completo abajo sin cortarse)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Bandeja GSM",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = usuario.nombre,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Bandeja GSM",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
                     )
-                    // Badge de Rol estilo Teamwork
                     Surface(
                         color = TeamworkBlue.copy(alpha = 0.12f),
                         shape = CircleShape
@@ -80,24 +78,17 @@ fun BandejaScreen(
                         )
                     }
                 }
-            }
-
-            FilledTonalButton(
-                onClick = alCerrarSesion,
-                shape = CircleShape,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
-                    contentColor = MaterialTheme.colorScheme.error
-                ),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-            ) {
-                Text("Salir", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = usuario.nombre,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // 2. BARRA DE HERRAMIENTAS UNIFICADA (Acción + Buscador + Filtros en una sola tarjeta limpia)
+        // 2. BARRA DE HERRAMIENTAS UNIFICADA (Buscador + Filtros en una sola tarjeta limpia)
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = Color.White,
@@ -107,31 +98,6 @@ fun BandejaScreen(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Botón de acción rápida según rol (Estilo Teamwork CTA)
-                if (usuario.rol == RolUsuario.CLIENTE) {
-                    Button(
-                        onClick = alIrACrear,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TeamworkBlue)
-                    ) {
-                        Text("＋ Nueva Solicitud", fontWeight = FontWeight.SemiBold)
-                    }
-                } else if (usuario.rol == RolUsuario.ADMINISTRADOR) {
-                    Button(
-                        onClick = alIrADashboard,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TeamworkBlue)
-                    ) {
-                        Text("📊 Panel de Métricas", fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
                 // Buscador Spotlight con botón '✕' para limpiar rápido
                 TextField(
                     value = solicitudVm.textoBusqueda,
@@ -160,7 +126,7 @@ fun BandejaScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Filtros tipo píldora (con nombres limpios sin guiones bajos)
+                // Filtros tipo píldora por Estado
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -187,7 +153,6 @@ fun BandejaScreen(
                         FilterChip(
                             selected = solicitudVm.estadoFiltro == estado,
                             onClick = { solicitudVm.cambiarFiltroEstado(estado, usuario) },
-                            // Convierte "EN_PROCESO" -> "En proceso"
                             label = {
                                 Text(
                                     estado.name.replace("_", " ")
@@ -200,12 +165,66 @@ fun BandejaScreen(
                         )
                     }
                 }
+
+                // Filtros adicionales de Prioridad, Cliente y Técnico (Criterios 25, 26 y 27)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    PrioridadSolicitud.entries.forEach { prio ->
+                        FilterChip(
+                            selected = solicitudVm.prioridadFiltro == prio,
+                            onClick = {
+                                val nueva = if (solicitudVm.prioridadFiltro == prio) null else prio
+                                solicitudVm.cambiarFiltroPrioridad(nueva, usuario)
+                            },
+                            label = { Text("⚡ ${prio.name}") },
+                            shape = CircleShape,
+                            border = null
+                        )
+                    }
+
+                    if (usuario.rol == RolUsuario.ADMINISTRADOR) {
+                        FilterChip(
+                            selected = solicitudVm.clienteFiltroId == 1,
+                            onClick = {
+                                val nuevo = if (solicitudVm.clienteFiltroId == 1) null else 1
+                                solicitudVm.cambiarFiltroCliente(nuevo, usuario)
+                            },
+                            label = { Text("👤 Cliente: Camila") },
+                            shape = CircleShape,
+                            border = null
+                        )
+                        FilterChip(
+                            selected = solicitudVm.tecnicoFiltroId == 3,
+                            onClick = {
+                                val nuevo = if (solicitudVm.tecnicoFiltroId == 3) null else 3
+                                solicitudVm.cambiarFiltroTecnico(nuevo, usuario)
+                            },
+                            label = { Text("🔧 Téc: Diego") },
+                            shape = CircleShape,
+                            border = null
+                        )
+                        FilterChip(
+                            selected = solicitudVm.tecnicoFiltroId == 4,
+                            onClick = {
+                                val nuevo = if (solicitudVm.tecnicoFiltroId == 4) null else 4
+                                solicitudVm.cambiarFiltroTecnico(nuevo, usuario)
+                            },
+                            label = { Text("🔧 Téc: Valentina") },
+                            shape = CircleShape,
+                            border = null
+                        )
+                    }
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 3. CABECERA DE COLA DE TICKETS (Contador en vivo estilo Teamwork)
+        // 3. CABECERA DE COLA DE TICKETS
         Row(
             modifier = Modifier
                 .fillMaxWidth()

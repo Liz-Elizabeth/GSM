@@ -1,5 +1,6 @@
 package com.example.gsm.ui.view.screens.usuario
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gsm.data.model.EstadoSolicitud
@@ -19,6 +21,7 @@ import com.example.gsm.data.model.PrioridadSolicitud
 import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.ui.view.components.EncabezadoPantalla
+import com.example.gsm.ui.view.components.formatearFechaHora
 import com.example.gsm.ui.viewmodel.DetalleSolicitudViewModel
 
 // Paleta Apple + Teamwork
@@ -60,6 +63,8 @@ fun DetalleSolicitudScreen(
     detalleVm: DetalleSolicitudViewModel,
     alVolver: () -> Unit
 ) {
+    val context = LocalContext.current
+
     LaunchedEffect(solicitudId, usuario.rol) {
         detalleVm.limpiarMensaje()
         detalleVm.cargarDetalle(solicitudId, usuario.rol)
@@ -156,6 +161,16 @@ fun DetalleSolicitudScreen(
                 // Metadatos limpios
                 Text(
                     text = "🏷️ Categoría: ${sol.categoria.descripcion}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "📅 Creado: ${formatearFechaHora(sol.fechaCreacion)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "🕒 Última actualización: ${formatearFechaHora(sol.fechaActualizacion)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -421,17 +436,39 @@ fun DetalleSolicitudScreen(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    FilledTonalButton(
-                        onClick = { detalleVm.simularEnvioWhatsApp() },
-                        enabled = !detalleVm.enviandoWhatsApp,
-                        shape = CircleShape,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = if (detalleVm.enviandoWhatsApp) "Enviando..." else "Enviar ahora",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilledTonalButton(
+                            onClick = { detalleVm.simularEnvioWhatsApp() },
+                            enabled = !detalleVm.enviandoWhatsApp,
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (detalleVm.enviandoWhatsApp) "Enviando..." else "Simular envío",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, detalleVm.mensajeWhatsApp)
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(sendIntent, "Compartir ticket por WhatsApp")
+                                )
+                            },
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreenText),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "Compartir 📲",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
                 Text(
@@ -490,7 +527,7 @@ fun DetalleSolicitudScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = evento.perfilUsuario.name,
+                                text = "${evento.perfilUsuario.name} • ${formatearFechaHora(evento.fechaCambio)}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

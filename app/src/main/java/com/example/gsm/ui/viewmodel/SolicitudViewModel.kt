@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.gsm.data.local.entity.NotificacionEntity
 import com.example.gsm.data.repository.GsmRepository
 import com.example.gsm.data.model.CategoriaSolicitud
 import com.example.gsm.data.model.EstadoSolicitud
@@ -28,6 +29,15 @@ class SolicitudViewModel(
     var prioridadFiltro by mutableStateOf<PrioridadSolicitud?>(null)
         private set
 
+    var clienteFiltroId by mutableStateOf<Int?>(null)
+        private set
+
+    var tecnicoFiltroId by mutableStateOf<Int?>(null)
+        private set
+
+    var notificaciones by mutableStateOf<List<NotificacionEntity>>(emptyList())
+        private set
+
     var soloAtrasadas by mutableStateOf(false)
         private set
 
@@ -39,14 +49,15 @@ class SolicitudViewModel(
 
     // Guarda la búsqueda actual para cerrarla antes de abrir una nueva
     private var busquedaActual: Job? = null
+    private var escuchaNotificaciones: Job? = null
 
     fun cargarSolicitudes(usuario: Usuario) {
         // Cerramos la consulta anterior para no acumularlas en memoria
         busquedaActual?.cancel()
 
         busquedaActual = viewModelScope.launch {
-            val idCliente = if (usuario.rol == RolUsuario.CLIENTE) usuario.id else null
-            val idTecnico = if (usuario.rol == RolUsuario.TECNICO) usuario.id else null
+            val idCliente = if (usuario.rol == RolUsuario.CLIENTE) usuario.id else clienteFiltroId
+            val idTecnico = if (usuario.rol == RolUsuario.TECNICO) usuario.id else tecnicoFiltroId
 
             val flujo = if (soloAtrasadas) {
                 repo.listarAtrasadas()
@@ -61,6 +72,13 @@ class SolicitudViewModel(
 
             flujo.collect { lista ->
                 listaSolicitudes = filtrarPorBusquedaYRol(lista, usuario)
+            }
+        }
+
+        escuchaNotificaciones?.cancel()
+        escuchaNotificaciones = viewModelScope.launch {
+            repo.obtenerNotificaciones(usuario.id).collect { lista ->
+                notificaciones = lista
             }
         }
     }
@@ -94,6 +112,22 @@ class SolicitudViewModel(
     fun cambiarFiltroPrioridad(nuevaPrioridad: PrioridadSolicitud?, usuario: Usuario) {
         prioridadFiltro = nuevaPrioridad
         cargarSolicitudes(usuario)
+    }
+
+    fun cambiarFiltroCliente(nuevoClienteId: Int?, usuario: Usuario) {
+        clienteFiltroId = nuevoClienteId
+        cargarSolicitudes(usuario)
+    }
+
+    fun cambiarFiltroTecnico(nuevoTecnicoId: Int?, usuario: Usuario) {
+        tecnicoFiltroId = nuevoTecnicoId
+        cargarSolicitudes(usuario)
+    }
+
+    fun marcarNotificacionLeida(notificacionId: Int) {
+        viewModelScope.launch {
+            repo.marcarNotificacionLeida(notificacionId)
+        }
     }
 
     fun cambiarFiltroAtrasadas(verSoloAtrasadas: Boolean, usuario: Usuario) {
