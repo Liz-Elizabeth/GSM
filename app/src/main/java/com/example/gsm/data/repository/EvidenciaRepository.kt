@@ -5,32 +5,28 @@ import com.example.gsm.data.local.entity.EvidenciaEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Sub-repositorio encargado de gestionar evidencias y archivos de prueba.
- * Cumple las restricciones de seguridad del PDF (Pág. 16) y OWASP M4:
- * - Limita los formatos permitidos.
- * - Limita el tamaño máximo de los archivos (5 MB).
+ * Sub-repositorio encargado de gestionar evidencias y archivos reales o de prueba.
+ * Permite cargar cualquier tipo de archivo (imágenes, PDFs, logs, documentos)
+ * y protege la app limitando el tamaño a un máximo de 15 MB (OWASP Input Validation).
  */
 class EvidenciaRepository(
     private val evidenciaDao: EvidenciaDao
 ) {
 
     companion object {
-        // Formatos permitidos según buenas prácticas OWASP y Pág. 16 del PDF
-        val FORMATOS_PERMITIDOS = setOf(
-            "image/jpeg",
-            "image/png",
-            "application/pdf",
-            "text/plain"
-        )
-        const val TAMANO_MAXIMO_BYTES = 5L * 1024L * 1024L // 5 MB máximo
+        const val TAMANO_MAXIMO_BYTES = 15L * 1024L * 1024L // 15 MB máximo
     }
 
-    suspend fun adjuntarEvidenciaFicticia(
+    /**
+     * Adjunta un archivo real o simulado a una solicitud.
+     */
+    suspend fun adjuntarEvidencia(
         solicitudId: Int,
         usuarioId: Int,
         nombreArchivo: String,
         tipoArchivo: String = "image/png",
-        tamanoBytes: Long = 250_000L, // ~250 KB por defecto para simulación
+        tamanoBytes: Long = 250_000L,
+        uriLocal: String? = null,
         descripcion: String? = null,
         ahora: Long = System.currentTimeMillis()
     ): Result<Long> {
@@ -40,20 +36,17 @@ class EvidenciaRepository(
             require(nombreLimpio.isNotBlank()) {
                 "El nombre del archivo no puede estar vacío."
             }
-            require(tipoArchivo in FORMATOS_PERMITIDOS) {
-                "Formato no permitido ($tipoArchivo). Solo se admiten imágenes (JPG/PNG), PDF o TXT."
-            }
             require(tamanoBytes in 1..TAMANO_MAXIMO_BYTES) {
-                "El tamaño del archivo supera el límite permitido de 5 MB."
+                "El tamaño del archivo supera el límite permitido de 15 MB."
             }
 
             val entidad = EvidenciaEntity(
                 solicitudId = solicitudId,
                 usuarioId = usuarioId,
                 nombreArchivo = nombreLimpio,
-                tipoArchivo = tipoArchivo,
+                tipoArchivo = tipoArchivo.ifBlank { "application/octet-stream" },
                 tamanoBytes = tamanoBytes,
-                uriLocal = "file:///ficticio/evidencias/$nombreLimpio",
+                uriLocal = uriLocal ?: "file:///evidencias/$nombreLimpio",
                 descripcion = descripcion?.trim(),
                 estadoRevision = "PENDIENTE",
                 fechaIncorporacion = ahora
@@ -64,6 +57,27 @@ class EvidenciaRepository(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    suspend fun adjuntarEvidenciaFicticia(
+        solicitudId: Int,
+        usuarioId: Int,
+        nombreArchivo: String,
+        tipoArchivo: String = "image/png",
+        tamanoBytes: Long = 250_000L,
+        descripcion: String? = null,
+        ahora: Long = System.currentTimeMillis()
+    ): Result<Long> {
+        return adjuntarEvidencia(
+            solicitudId = solicitudId,
+            usuarioId = usuarioId,
+            nombreArchivo = nombreArchivo,
+            tipoArchivo = tipoArchivo,
+            tamanoBytes = tamanoBytes,
+            uriLocal = null,
+            descripcion = descripcion,
+            ahora = ahora
+        )
     }
 
     fun obtenerPorSolicitud(solicitudId: Int): Flow<List<EvidenciaEntity>> =

@@ -1,5 +1,8 @@
 package com.example.gsm.ui.view.screens.usuario
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -8,16 +11,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gsm.data.model.CategoriaSolicitud
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.ui.view.components.EncabezadoPantalla
 import com.example.gsm.ui.viewmodel.SolicitudViewModel
+import com.example.gsm.util.ArchivoAdjunto
+import com.example.gsm.util.FileUtil
+import com.example.gsm.ui.view.components.VisorEvidenciaModal
+import com.example.gsm.ui.view.components.DatosEvidenciaVisualizar
 
 // Paleta Apple + Teamwork
 private val AppleBackground = Color(0xFFF2F2F7)
@@ -48,12 +58,23 @@ fun CrearSolicitudScreen(
     solicitudVm: SolicitudViewModel,
     alVolver: () -> Unit
 ) {
+    val context = LocalContext.current
+
     var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
     var categoriaSeleccionada by remember { mutableStateOf(CategoriaSolicitud.INCIDENTE_TECNICO) }
     var servicio by remember { mutableStateOf("") }
     var activo by remember { mutableStateOf("") }
-    var adjuntarEvidenciaDemo by remember { mutableStateOf(false) }
+    var archivoSeleccionado by remember { mutableStateOf<ArchivoAdjunto?>(null) }
+    var verEvidenciaModal by remember { mutableStateOf(false) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            archivoSeleccionado = FileUtil.obtenerDatosDeUri(context, uri)
+        }
+    }
 
     val camposValidos = titulo.isNotBlank() && descripcion.isNotBlank()
 
@@ -66,7 +87,10 @@ fun CrearSolicitudScreen(
             cliente = cliente,
             servicio = servicio.ifBlank { null },
             activo = activo.ifBlank { null },
-            evidencia = if (adjuntarEvidenciaDemo) "captura_error.png" else null,
+            nombreEvidencia = archivoSeleccionado?.nombre,
+            tipoEvidencia = archivoSeleccionado?.tipoMime,
+            tamanoEvidencia = archivoSeleccionado?.tamanoBytes,
+            uriEvidencia = archivoSeleccionado?.uriString,
             esBorrador = esBorrador,
             alCrearConExito = alVolver
         )
@@ -79,14 +103,16 @@ fun CrearSolicitudScreen(
             .padding(horizontal = 16.dp, vertical = 14.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        // Barra Superior
         EncabezadoPantalla(
-            titulo = "Nuevo Ticket",
+            titulo = "Nueva Solicitud",
+            textoBotonDerecho = "Cancelar",
             alHacerClicDerecho = alVolver
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 1. BLOQUE PRINCIPAL: DETALLE DEL TICKET (Obligatorio)
+        // 1. BLOQUE PRINCIPAL: INFORMACIÓN OBLIGATORIA
         SeccionTitulo("1. Información Principal (Obligatorio)")
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -149,7 +175,7 @@ fun CrearSolicitudScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // 2. BLOQUE SECUNDARIO: CONTEXTO Y ARCHIVOS (Opcional)
-        SeccionTitulo("2. Contexto Técnico y Archivos (Opcional)")
+        SeccionTitulo("2. Contexto Técnico y Evidencias Reales")
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = Color.White,
@@ -157,7 +183,7 @@ fun CrearSolicitudScreen(
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 TextField(
                     value = servicio,
@@ -181,30 +207,101 @@ fun CrearSolicitudScreen(
 
                 HorizontalDivider(color = AppleBackground)
 
-                // Switch de adjunto integrado en la misma tarjeta
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "📎 Adjuntar evidencia demo",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "captura_error.png • 350 KB",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = adjuntarEvidenciaDemo,
-                        onCheckedChange = { adjuntarEvidenciaDemo = it }
+                // SELECTOR DE ARCHIVOS REALES DEL DISPOSITIVO
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "📎 Archivo o Evidencia Adjunta:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
+
+                    if (archivoSeleccionado != null) {
+                        val archivo = archivoSeleccionado!!
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = TeamworkBlue.copy(alpha = 0.08f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = FileUtil.obtenerIconoVectorSegunMime(archivo.tipoMime),
+                                        contentDescription = null,
+                                        tint = TeamworkBlue,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = archivo.nombre,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = "${FileUtil.formatearTamano(archivo.tamanoBytes)} • ${archivo.tipoMime}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    TextButton(
+                                        onClick = { verEvidenciaModal = true },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Visibility, contentDescription = "Ver", modifier = Modifier.size(18.dp), tint = TeamworkBlue)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Ver", fontWeight = FontWeight.Bold, color = TeamworkBlue)
+                                    }
+                                    IconButton(onClick = { archivoSeleccionado = null }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { filePickerLauncher.launch("*/*") },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Cargar del Dispositivo")
+                            }
+
+                            FilledTonalButton(
+                                onClick = {
+                                    archivoSeleccionado = ArchivoAdjunto(
+                                        nombre = "captura_error_500.png",
+                                        tipoMime = "image/png",
+                                        tamanoBytes = 358_000L,
+                                        uriString = "file:///demo/captura_error_500.png"
+                                    )
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Filled.Smartphone, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Demo")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -259,5 +356,19 @@ fun CrearSolicitudScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (verEvidenciaModal && archivoSeleccionado != null) {
+        val arch = archivoSeleccionado!!
+        VisorEvidenciaModal(
+            evidencia = DatosEvidenciaVisualizar(
+                nombreArchivo = arch.nombre,
+                tipoArchivo = arch.tipoMime,
+                tamanoBytes = arch.tamanoBytes,
+                uriString = arch.uriString,
+                estadoRevision = "PENDIENTE"
+            ),
+            onDismiss = { verEvidenciaModal = false }
+        )
     }
 }

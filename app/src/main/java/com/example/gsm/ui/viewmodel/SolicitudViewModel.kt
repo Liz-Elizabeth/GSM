@@ -147,7 +147,10 @@ class SolicitudViewModel(
         cliente: Usuario,
         servicio: String?,
         activo: String?,
-        evidencia: String?,
+        nombreEvidencia: String? = null,
+        tipoEvidencia: String? = null,
+        tamanoEvidencia: Long? = null,
+        uriEvidencia: String? = null,
         esBorrador: Boolean = false,
         alCrearConExito: () -> Unit = {}
     ) {
@@ -159,7 +162,10 @@ class SolicitudViewModel(
                 cliente = cliente,
                 servicioRelacionado = servicio,
                 activoRelacionado = activo,
-                nombreArchivoEvidencia = evidencia,
+                nombreArchivoEvidencia = nombreEvidencia,
+                tipoArchivoEvidencia = tipoEvidencia,
+                tamanoArchivoEvidencia = tamanoEvidencia,
+                uriEvidencia = uriEvidencia,
                 esBorrador = esBorrador
             )
 
@@ -169,6 +175,34 @@ class SolicitudViewModel(
                 alCrearConExito()
             } else {
                 mensaje = resultado.exceptionOrNull()?.message ?: "Error al crear la solicitud"
+            }
+        }
+    }
+
+    /**
+     * Búsqueda instantánea por Código QR escaneado con CameraX.
+     */
+    fun buscarPorQr(
+        codigoQr: String,
+        alEncontrar: (Int) -> Unit,
+        alFallar: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val codigoLimpio = when {
+                codigoQr.contains("SOL-") -> {
+                    val inicio = codigoQr.indexOf("SOL-")
+                    codigoQr.substring(inicio).take(13).trim()
+                }
+                else -> codigoQr.trim()
+            }
+
+            val sol = repo.buscarPorCodigo(codigoLimpio)
+            if (sol != null) {
+                alEncontrar(sol.id)
+            } else {
+                val err = "No se encontró ningún ticket con el código '$codigoLimpio'."
+                mensaje = err
+                alFallar(err)
             }
         }
     }

@@ -5,18 +5,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.ui.view.screens.admin.AdminDashboardScreen
+import com.example.gsm.ui.view.screens.admin.GestionUsuariosScreen
 import com.example.gsm.ui.view.screens.auth.LoginScreen
 import com.example.gsm.ui.view.screens.usuario.BandejaScreen
 import com.example.gsm.ui.view.screens.usuario.CrearSolicitudScreen
 import com.example.gsm.ui.view.screens.usuario.DetalleSolicitudScreen
 import com.example.gsm.ui.view.screens.usuario.NotificacionesScreen
 import com.example.gsm.ui.view.screens.usuario.PerfilScreen
+import com.example.gsm.ui.view.screens.usuario.WalletTicketsScreen
 import com.example.gsm.ui.viewmodel.AdminDashboardViewModel
 import com.example.gsm.ui.viewmodel.AuthViewModel
 import com.example.gsm.ui.viewmodel.DetalleSolicitudViewModel
@@ -67,7 +71,22 @@ fun AppNavigation(
 
                     "dashboard" -> AdminDashboardScreen(
                         dashboardVm = dashboardVm,
+                        alIrAGestionUsuarios = { pantallaActual = "gestion_usuarios" },
                         alVolver = { pantallaActual = "bandeja" }
+                    )
+
+                    "gestion_usuarios" -> GestionUsuariosScreen(
+                        dashboardVm = dashboardVm,
+                        alVolver = { pantallaActual = "perfil" }
+                    )
+
+                    "wallet" -> WalletTicketsScreen(
+                        usuario = usuarioActual,
+                        solicitudVm = solicitudVm,
+                        alIrADetalle = { id ->
+                            solicitudSeleccionadaId = id
+                            pantallaActual = "detalle"
+                        }
                     )
 
                     "notificaciones" -> NotificacionesScreen(
@@ -80,6 +99,8 @@ fun AppNavigation(
 
                     "perfil" -> PerfilScreen(
                         usuario = usuarioActual,
+                        authVm = authVm,
+                        alIrAGestionUsuarios = { pantallaActual = "gestion_usuarios" },
                         alCerrarSesion = {
                             pantallaActual = "bandeja"
                             authVm.cerrarSesion()
@@ -116,8 +137,16 @@ fun AppNavigation(
                 NavigationBarItem(
                     selected = pantallaActual == "bandeja" || pantallaActual == "detalle",
                     onClick = { pantallaActual = "bandeja" },
-                    icon = { Text("🏠", style = MaterialTheme.typography.titleLarge) },
+                    icon = { Icon(Icons.Filled.ConfirmationNumber, contentDescription = "Bandeja") },
                     label = { Text("Bandeja", fontWeight = FontWeight.Medium) }
+                )
+
+                // Pestaña 2: Wallet / Pases QR (Estilo Apple Wallet / Eventos)
+                NavigationBarItem(
+                    selected = pantallaActual == "wallet",
+                    onClick = { pantallaActual = "wallet" },
+                    icon = { Icon(Icons.Filled.QrCode2, contentDescription = "Pases QR") },
+                    label = { Text("Pases QR", fontWeight = FontWeight.Medium) }
                 )
 
                 // Pestaña 2 (Según Rol): Crear Ticket (Cliente) o Métricas (Admin)
@@ -128,14 +157,14 @@ fun AppNavigation(
                             solicitudVm.limpiarMensaje()
                             pantallaActual = "crear"
                         },
-                        icon = { Text("➕", style = MaterialTheme.typography.titleLarge) },
+                        icon = { Icon(Icons.Filled.AddCircle, contentDescription = "Nuevo") },
                         label = { Text("Nuevo", fontWeight = FontWeight.Medium) }
                     )
                 } else if (usuarioActual.rol == RolUsuario.ADMINISTRADOR) {
                     NavigationBarItem(
                         selected = pantallaActual == "dashboard",
                         onClick = { pantallaActual = "dashboard" },
-                        icon = { Text("📊", style = MaterialTheme.typography.titleLarge) },
+                        icon = { Icon(Icons.Filled.BarChart, contentDescription = "Métricas") },
                         label = { Text("Métricas", fontWeight = FontWeight.Medium) }
                     )
                 }
@@ -145,10 +174,13 @@ fun AppNavigation(
                     selected = pantallaActual == "notificaciones",
                     onClick = { pantallaActual = "notificaciones" },
                     icon = {
-                        Text(
-                            text = if (noLeidas > 0) "🔔 $noLeidas" else "🔔",
-                            style = MaterialTheme.typography.titleLarge
-                        )
+                        if (noLeidas > 0) {
+                            BadgedBox(badge = { Badge { Text("$noLeidas") } }) {
+                                Icon(Icons.Filled.Notifications, contentDescription = "Alertas")
+                            }
+                        } else {
+                            Icon(Icons.Filled.NotificationsNone, contentDescription = "Alertas")
+                        }
                     },
                     label = { Text("Alertas", fontWeight = FontWeight.Medium) }
                 )
@@ -157,7 +189,7 @@ fun AppNavigation(
                 NavigationBarItem(
                     selected = pantallaActual == "perfil",
                     onClick = { pantallaActual = "perfil" },
-                    icon = { Text("👤", style = MaterialTheme.typography.titleLarge) },
+                    icon = { Icon(Icons.Filled.Person, contentDescription = "Perfil") },
                     label = { Text("Perfil", fontWeight = FontWeight.Medium) }
                 )
             }

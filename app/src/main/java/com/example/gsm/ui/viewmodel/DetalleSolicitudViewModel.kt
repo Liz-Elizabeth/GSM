@@ -78,6 +78,32 @@ class DetalleSolicitudViewModel(
         }
     }
 
+    fun adjuntarEvidencia(
+        solicitudId: Int,
+        usuario: Usuario,
+        nombre: String,
+        tipo: String,
+        tamano: Long,
+        uri: String
+    ) {
+        viewModelScope.launch {
+            val res = repo.adjuntarEvidencia(
+                solicitudId = solicitudId,
+                usuario = usuario,
+                nombreArchivo = nombre,
+                tipoArchivo = tipo,
+                tamanoBytes = tamano,
+                uriLocal = uri,
+                descripcion = "Evidencia adjuntada por " + usuario.nombre
+            )
+            if (res.isSuccess) {
+                mensaje = "Archivo '" + nombre + "' adjuntado exitosamente."
+            } else {
+                mensaje = res.exceptionOrNull()?.message ?: "Error al adjuntar archivo."
+            }
+        }
+    }
+
     // Función ayudante para no repetir el mismo if/else en los 9 botones
     private fun ejecutarCambio(
         solicitudId: Int,

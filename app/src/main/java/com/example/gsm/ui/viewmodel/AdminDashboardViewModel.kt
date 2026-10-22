@@ -6,13 +6,17 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gsm.data.local.model.ConteoPorTecnicoDto
-import com.example.gsm.data.repository.GsmRepository
 import com.example.gsm.data.model.EstadoSolicitud
 import com.example.gsm.data.model.PrioridadSolicitud
+import com.example.gsm.data.model.RolUsuario
+import com.example.gsm.data.model.Usuario
+import com.example.gsm.data.repository.GsmRepository
+import com.example.gsm.data.repository.UsuarioRepository
 import kotlinx.coroutines.launch
 
 class AdminDashboardViewModel(
-    private val repo: GsmRepository
+    private val repo: GsmRepository,
+    private val usuarioRepo: UsuarioRepository
 ) : ViewModel() {
 
     var recibidas by mutableStateOf(0)
@@ -46,9 +50,22 @@ class AdminDashboardViewModel(
     var porTecnico by mutableStateOf<List<ConteoPorTecnicoDto>>(emptyList())
         private set
 
-    // Se ejecuta solo al crearse el ViewModel (no hay que llamarlo a mano)
+    // Gestión de Usuarios y Roles (Fase 4 del Plan)
+    var listaUsuarios by mutableStateOf<List<Usuario>>(emptyList())
+        private set
+
+    var creandoUsuario by mutableStateOf(false)
+        private set
+
+    var mensajeUsuario by mutableStateOf<String?>(null)
+        private set
+
+    var errorUsuario by mutableStateOf<String?>(null)
+        private set
+
     init {
         cargarMetricas()
+        cargarUsuarios()
     }
 
     private fun cargarMetricas() {
@@ -68,5 +85,51 @@ class AdminDashboardViewModel(
         viewModelScope.launch { repo.metricasPorPrioridad(PrioridadSolicitud.URGENTE).collect { prioridadUrgente = it } }
 
         viewModelScope.launch { repo.metricasPorTecnico().collect { porTecnico = it } }
+    }
+
+    private fun cargarUsuarios() {
+        viewModelScope.launch {
+            usuarioRepo.obtenerTodos().collect { usuarios ->
+                listaUsuarios = usuarios
+            }
+        }
+    }
+
+    fun crearUsuario(
+        nombre: String,
+        correo: String,
+        password: String,
+        rol: RolUsuario,
+        empresa: String?,
+        telefono: String?,
+        onExito: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            creandoUsuario = true
+            errorUsuario = null
+            mensajeUsuario = null
+
+            val resultado = usuarioRepo.crearUsuario(
+                nombre = nombre,
+                correo = correo,
+                password = password,
+                rol = rol,
+                empresa = empresa,
+                telefono = telefono
+            )
+
+            if (resultado.isSuccess) {
+                mensajeUsuario = "Usuario creado exitosamente con rol ${rol.name}."
+                onExito()
+            } else {
+                errorUsuario = resultado.exceptionOrNull()?.message ?: "Error al registrar usuario."
+            }
+            creandoUsuario = false
+        }
+    }
+
+    fun limpiarMensajesUsuario() {
+        mensajeUsuario = null
+        errorUsuario = null
     }
 }

@@ -27,7 +27,7 @@ class GsmViewModelFactory(
                 DetalleSolicitudViewModel(gsmRepo, usuarioRepo) as T
             }
             modelClass.isAssignableFrom(AdminDashboardViewModel::class.java) -> {
-                AdminDashboardViewModel(gsmRepo) as T
+                AdminDashboardViewModel(gsmRepo, usuarioRepo) as T
             }
             else -> throw IllegalArgumentException("ViewModel desconocido: ${modelClass.name}")
         }

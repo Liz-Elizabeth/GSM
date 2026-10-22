@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +21,8 @@ import com.example.gsm.data.model.EstadoSolicitud
 import com.example.gsm.data.model.PrioridadSolicitud
 import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Usuario
+import com.example.gsm.ui.view.components.QrScannerModal
+import com.example.gsm.ui.view.components.QrNoEncontradoDialog
 import com.example.gsm.ui.view.components.TarjetaSolicitudItem
 import com.example.gsm.ui.viewmodel.SolicitudViewModel
 
@@ -36,6 +40,9 @@ fun BandejaScreen(
     alIrADashboard: () -> Unit,
     alCerrarSesion: () -> Unit
 ) {
+    var mostrarQrScanner by remember { mutableStateOf(false) }
+    var qrNoEncontradoCodigo by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(usuario.id) {
         solicitudVm.cargarSolicitudes(usuario)
     }
@@ -98,33 +105,62 @@ fun BandejaScreen(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Buscador Spotlight con botón '✕' para limpiar rápido
-                TextField(
-                    value = solicitudVm.textoBusqueda,
-                    onValueChange = { solicitudVm.cambiarTextoBusqueda(it, usuario) },
-                    placeholder = {
-                        Text(
-                            text = "🔍 Buscar código (SOL-2026...) o título",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    trailingIcon = {
-                        if (solicitudVm.textoBusqueda.isNotEmpty()) {
-                            TextButton(onClick = { solicitudVm.cambiarTextoBusqueda("", usuario) }) {
-                                Text("✕", fontWeight = FontWeight.Bold)
+                // Buscador Spotlight con botón '✕' + Lector QR con CameraX
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextField(
+                        value = solicitudVm.textoBusqueda,
+                        onValueChange = { solicitudVm.cambiarTextoBusqueda(it, usuario) },
+                        placeholder = {
+                            Text(
+                                text = "🔍 Buscar código o título...",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        trailingIcon = {
+                            if (solicitudVm.textoBusqueda.isNotEmpty()) {
+                                TextButton(onClick = { solicitudVm.cambiarTextoBusqueda("", usuario) }) {
+                                    Text("✕", fontWeight = FontWeight.Bold)
+                                }
                             }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = AppleInputFill,
-                        unfocusedContainerColor = AppleInputFill,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = AppleInputFill,
+                            unfocusedContainerColor = AppleInputFill,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    FilledTonalButton(
+                        onClick = { mostrarQrScanner = true },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = TeamworkBlue.copy(alpha = 0.12f),
+                            contentColor = TeamworkBlue
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier.height(52.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.QrCodeScanner,
+                            contentDescription = "Escanear QR",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "QR",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 // Filtros tipo píldora por Estado
                 Row(
@@ -291,5 +327,38 @@ fun BandejaScreen(
                 }
             }
         }
+    }
+
+    // Modal de Escaneo con CameraX
+    if (mostrarQrScanner) {
+        QrScannerModal(
+            onDismiss = { mostrarQrScanner = false },
+            onQrDetectado = { codigoLeido ->
+                mostrarQrScanner = false
+                solicitudVm.buscarPorQr(
+                    codigoQr = codigoLeido,
+                    alEncontrar = { idTicket ->
+                        alIrADetalle(idTicket)
+                    },
+                    alFallar = {
+                        qrNoEncontradoCodigo = codigoLeido
+                    }
+                )
+            }
+        )
+    }
+
+    // Modal animado si el QR no coincide con ningún ticket existente
+    if (qrNoEncontradoCodigo != null) {
+        QrNoEncontradoDialog(
+            codigoEscaneado = qrNoEncontradoCodigo!!,
+            onReintentar = {
+                qrNoEncontradoCodigo = null
+                mostrarQrScanner = true
+            },
+            onCerrar = {
+                qrNoEncontradoCodigo = null
+            }
+        )
     }
 }

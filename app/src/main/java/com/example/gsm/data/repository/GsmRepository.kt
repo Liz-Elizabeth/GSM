@@ -37,6 +37,9 @@ class GsmRepository(
         servicioRelacionado: String? = null,
         activoRelacionado: String? = null,
         nombreArchivoEvidencia: String? = null,
+        tipoArchivoEvidencia: String? = null,
+        tamanoArchivoEvidencia: Long? = null,
+        uriEvidencia: String? = null,
         esBorrador: Boolean = false
     ): Result<Solicitud> {
         return try {
@@ -70,10 +73,13 @@ class GsmRepository(
 
             // Si viene con evidencia ficticia adjunta, la registramos (Criterio 3)
             if (!nombreArchivoEvidencia.isNullOrBlank()) {
-                evidenciaRepo?.adjuntarEvidenciaFicticia(
+                evidenciaRepo?.adjuntarEvidencia(
                     solicitudId = idGenerado,
                     usuarioId = cliente.id,
                     nombreArchivo = nombreArchivoEvidencia,
+                    tipoArchivo = tipoArchivoEvidencia ?: "image/png",
+                    tamanoBytes = tamanoArchivoEvidencia ?: 250_000L,
+                    uriLocal = uriEvidencia,
                     descripcion = "Evidencia inicial adjuntada al crear la solicitud",
                     ahora = ahora
                 )
@@ -506,16 +512,18 @@ class GsmRepository(
         nombreArchivo: String,
         tipoArchivo: String = "image/png",
         tamanoBytes: Long = 250_000L,
+        uriLocal: String? = null,
         descripcion: String? = null
     ): Result<Long> {
         val repo = evidenciaRepo
             ?: return Result.failure(IllegalStateException("EvidenciaRepository no inicializado."))
-        return repo.adjuntarEvidenciaFicticia(
+        return repo.adjuntarEvidencia(
             solicitudId = solicitudId,
             usuarioId = usuario.id,
             nombreArchivo = nombreArchivo,
             tipoArchivo = tipoArchivo,
             tamanoBytes = tamanoBytes,
+            uriLocal = uriLocal,
             descripcion = descripcion
         )
     }
