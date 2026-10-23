@@ -14,9 +14,13 @@
 [![MVVM](https://img.shields.io/badge/Arquitectura-MVVM%20%2B%20KISS-success.svg)](https://developer.android.com/topic/architecture)
 [![Duoc UC](https://img.shields.io/badge/Duoc%20UC-DSY1105-002B49.svg)](https://www.duoc.cl/)
 
+[![Web Live](https://img.shields.io/badge/Web_Live-Vercel-000000.svg?logo=vercel&logoColor=white)](https://gsm-web-delta.vercel.app/)
+
 **Desarrollado por Elizabeth Reyes y Juan Varas**
 
-** web: https://gsm-web-delta.vercel.app/ **
+<br>
+
+[![Explorar Demo Web](https://img.shields.io/badge/🌐%20Explorar%20Demo%20Web%20en%20Vivo-gsm--web--delta.vercel.app-0070F3?style=for-the-badge&logo=vercel&logoColor=white)](https://gsm-web-delta.vercel.app/)
 
 </div>
 
@@ -25,6 +29,7 @@
 ## 📑 Índice
 
 1. [¿De qué trata el proyecto?](#-1-de-qué-trata-el-proyecto)
+   - [Plataforma Web y Demo en Vivo](#-plataforma-web-complementaria-y-demo-en-vivo)
 2. [Estado del Proyecto (Progreso 100%)](#-2-estado-del-proyecto-progreso-100)
 3. [Conceptos básicos explicados fácil (para estudiantes y principiantes)](#-3-conceptos-básicos-explicados-fácil-para-estudiantes-y-principiantes)
 4. [Cómo está organizado el código (Estructura de Carpetas)](#-4-cómo-está-organizado-el-código-estructura-de-carpetas)
@@ -39,6 +44,7 @@
    - [Chat Estilo WhatsApp con Notas Internas Unificadas](#-85-chat-estilo-whatsapp-con-notas-internas-unificadas)
    - [Recuperación de Contraseñas y Edición de Perfil](#-86-recuperación-de-contraseñas-y-edición-de-perfil)
    - [Gestión de Usuarios y Creación de Cuentas por el Administrador](#-87-gestión-de-usuarios-y-creación-de-cuentas-por-el-administrador)
+   - [Plataforma Web y Landing de Trazabilidad (Vercel)](#-88-plataforma-web-y-landing-de-trazabilidad-vercel)
 9. [Los ViewModels explicados línea por línea](#-9-los-viewmodels-explicados-línea-por-línea)
 10. [Datos de prueba (Cuentas y tickets precargados)](#-10-datos-de-prueba-cuentas-y-tickets-precargados)
 11. [Seguridad y buenas prácticas aplicadas (OWASP + KISS)](#-11-seguridad-y-buenas-prácticas-aplicadas-owasp--kiss)
@@ -78,6 +84,30 @@ Una pyme de servicios informáticos (desarrollo web, soporte técnico, hosting y
 - ✅ **100% Offline y Confiable:** Toda la base de datos se almacena localmente en SQLite mediante Room. No requiere internet para funcionar.
 
 > 🎓 **Contexto académico:** Proyecto semestral de la asignatura **DSY1105 - Desarrollo de Aplicaciones Móviles**, Escuela de Informática y Telecomunicaciones, CITT Puente Alto, Duoc UC.
+
+---
+
+### 🌐 Plataforma Web Complementaria y Demo en Vivo
+
+Para complementar la aplicación móvil nativa y permitir a clientes, evaluadores y docentes explorar el ecosistema GSM de forma inmediata desde cualquier navegador (sin necesidad de compilar el APK en Android Studio), se diseñó y desplegó una **plataforma web en producción con Vercel**:
+
+<div align="center">
+
+[![Plataforma Web GSM](https://img.shields.io/badge/Sitio_Web_Oficial-gsm--web--delta.vercel.app-0070F3?style=for-the-badge&logo=vercel&logoColor=white)](https://gsm-web-delta.vercel.app/)
+[![Despliegue Vercel](https://img.shields.io/badge/Vercel-Producci%C3%B3n-brightgreen?style=for-the-badge&logo=vercel&logoColor=white)](https://gsm-web-delta.vercel.app/)
+
+🔗 **Acceso directo:** [https://gsm-web-delta.vercel.app/](https://gsm-web-delta.vercel.app/)
+
+</div>
+
+#### 🎯 ¿Qué ofrece la plataforma web?
+- **Presentación Interactiva:** Exposición visual del problema de solicitudes perdidas en WhatsApp y cómo GSM centraliza la atención.
+- **Trazabilidad en Tiempo Real:** Demostración del ciclo de vida y asignación formal mediante códigos únicos (`SOL-2026-100X`).
+- **Demostración de Perfiles (RBAC):**
+  - 👤 **Cliente:** *Camila Rojas* (Pyme Soluciones Alfa Ltda.)
+  - 👑 **Coordinador Administrador:** *Roberto Méndez* (GSM Servicios Digitales)
+  - 🔧 **Técnico de Soporte:** *Diego Soto* (Infraestructura y Redes)
+- **Diseño Moderno & Responsivo:** Construido con tecnologías web de última generación (React + Vite), paleta de colores profesional y total compatibilidad con teléfonos inteligentes y computadores de escritorio.
 
 ---
 
@@ -370,6 +400,13 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 * **Pantalla Dedicada:** Accesible desde el perfil del Administrador y desde el panel de Métricas.
 * **Tarjetas Resumen:** Muestra contadores rápidos de usuarios registrados por rol (Clientes, Técnicos, Administradores).
 * **Alta de Usuarios con Chips:** Formulario modal para crear cuentas con validación de correo único, contraseña y selector de rol RBAC mediante `FilterChip`.
+
+---
+
+### 🌐 8.8. Plataforma Web y Landing de Trazabilidad (Vercel)
+* **Enlace Oficial:** [`https://gsm-web-delta.vercel.app/`](https://gsm-web-delta.vercel.app/)
+* **Hosting e Infraestructura:** Desplegado de forma continua en **Vercel** con certificado SSL / HTTPS activo.
+* **Integración al Ecosistema:** Funciona como portal público de divulgación y presentación para pymes y empresas de servicios TI. Permite a cualquier evaluador o cliente comprender la matriz de roles, la generación de pases digitales y el flujo de resolución de solicitudes antes de instalar la app nativa en su teléfono Android.
 
 ---
 
