@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
         EvidenciaEntity::class,
         NotificacionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class GsmDatabase : RoomDatabase() {
@@ -56,6 +56,14 @@ abstract class GsmDatabase : RoomDatabase() {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE usuarios ADD COLUMN debeCambiarPassword INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE usuarios ADD COLUMN plan TEXT NOT NULL DEFAULT 'PRO'")
+                db.execSQL("ALTER TABLE usuarios ADD COLUMN ticketsDisponibles INTEGER NOT NULL DEFAULT 25")
+                db.execSQL("ALTER TABLE usuarios ADD COLUMN estadoSuscripcion TEXT NOT NULL DEFAULT 'ACTIVA'")
             }
         }
 
@@ -91,7 +99,7 @@ abstract class GsmDatabase : RoomDatabase() {
                     "gsm_database.db"
                 )
                     .openHelperFactory(supportFactory)
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

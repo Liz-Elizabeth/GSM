@@ -87,6 +87,13 @@ enum class PlanSoporte(
         insignia = "Misión Crítica"
     );
 
+    val cuotaTicketsSemanales: Int
+        get() = when (this) {
+            PLUS -> 5
+            PRO -> 25
+            MAX -> 999
+        }
+
     companion object {
         fun obtenerPorId(id: String?): PlanSoporte {
             return entries.firstOrNull { it.idPlan.equals(id, ignoreCase = true) } ?: PRO

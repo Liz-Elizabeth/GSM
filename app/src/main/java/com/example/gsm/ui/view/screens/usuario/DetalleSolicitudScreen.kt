@@ -1042,7 +1042,8 @@ fun DetalleSolicitudScreen(
                                         "🏷️ Categoría: ${sol.categoria.descripcion}\n" +
                                         "⚡ Prioridad: ${sol.prioridad.name}\n" +
                                         "📊 Estado: ${sol.estado.name}\n" +
-                                        "🔗 Seguimiento: https://gsm-web-delta.vercel.app/seguimiento/${sol.codigoSeguimiento}"
+                                        "🔗 Ticket: https://gsm-web-delta.vercel.app/tickets/${sol.codigoSeguimiento}\n" +
+                                        "🌐 Web GSM: https://gsm-web-delta.vercel.app/"
 
                                 QrCodeUtil.compartirQrConTexto(
                                     context = context,

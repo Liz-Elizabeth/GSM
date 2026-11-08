@@ -11,6 +11,7 @@ import com.example.gsm.data.model.Solicitud
 import com.example.gsm.data.model.Usuario
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -50,12 +51,13 @@ class GsmRepository(
 
     /**
      * Sincronización en tiempo real del chat de un ticket (Firestore -> Room).
+     * Retorna el Job activo para permitir cancelación y evitar listeners duplicados.
      */
-    fun iniciarSincronizacionHistorial(codigoSeguimiento: String, solicitudIdLocal: Int, scope: CoroutineScope) {
+    fun iniciarSincronizacionHistorial(codigoSeguimiento: String, solicitudIdLocal: Int, scope: CoroutineScope): Job? {
         val codigoLimpio = codigoSeguimiento.trim()
-        if (codigoLimpio.isBlank()) return
+        if (codigoLimpio.isBlank()) return null
 
-        firebaseRepo?.escucharHistorialChat(codigoLimpio)
+        return firebaseRepo?.escucharHistorialChat(codigoLimpio)
             ?.catch { e -> Log.e("FirebaseSync", "Error en flujo historial chat: ${e.message}", e) }
             ?.onEach { mensajesRemotos ->
                 val ticketLocal = localRepo.obtenerPorCodigo(codigoLimpio)

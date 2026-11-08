@@ -113,6 +113,7 @@ fun ChatTicketScreen(
     var mostrarPlantillasRapidas by remember { mutableStateOf(false) }
     var evidenciaSeleccionada by remember { mutableStateOf<ArchivoAdjunto?>(null) }
     var evidenciaParaVer by remember { mutableStateOf<DatosEvidenciaVisualizar?>(null) }
+    var enviandoLocal by remember { mutableStateOf(false) }
 
     // Manejador de Cámara Nativa Segura
     var archivoFotoCamara by remember { mutableStateOf<File?>(null) }
@@ -182,14 +183,21 @@ fun ChatTicketScreen(
         }
     }
 
-    // Función de envío único (KISS)
+    // Función de envío único con debouncing y protección anti-duplicados (KISS)
     fun enviarMensajeActual() {
+        if (enviandoLocal || detalleVm.enviandoMensajeChat) return
         val tieneTexto = textoMensaje.isNotBlank()
         val tieneAdjunto = evidenciaSeleccionada != null
         if (!tieneTexto && !tieneAdjunto) return
 
+        enviandoLocal = true
         val textoFinal = if (tieneTexto) textoMensaje.trim() else "📷 Foto adjunta"
         val rutaAdjunto = evidenciaSeleccionada?.uriString
+
+        // Limpiar inputs de inmediato para evitar clics duplicados
+        textoMensaje = ""
+        evidenciaSeleccionada = null
+        mostrarPlantillasRapidas = false
 
         detalleVm.enviarMensajeChat(
             solicitudId = solicitudId,
@@ -199,11 +207,9 @@ fun ChatTicketScreen(
             evidenciaAdjunta = rutaAdjunto
         )
 
-        textoMensaje = ""
-        evidenciaSeleccionada = null
-        mostrarPlantillasRapidas = false
-
         coroutineScope.launch {
+            kotlinx.coroutines.delay(400) // Debounce anti-doble tap
+            enviandoLocal = false
             if (detalleVm.historial.isNotEmpty()) {
                 listState.animateScrollToItem(detalleVm.historial.size - 1)
             }
@@ -591,10 +597,10 @@ fun ChatTicketScreen(
                             modifier = Modifier.weight(1f)
                         )
 
-                        // Botón de Enviar Circular
-                        val puedeEnviar = textoMensaje.isNotBlank() || evidenciaSeleccionada != null
+                        // Botón de Enviar Circular con indicador de carga y prevención de doble toque
+                        val puedeEnviar = (textoMensaje.isNotBlank() || evidenciaSeleccionada != null) && !enviandoLocal && !detalleVm.enviandoMensajeChat
                         Surface(
-                            onClick = { enviarMensajeActual() },
+                            onClick = { if (puedeEnviar) enviarMensajeActual() },
                             enabled = puedeEnviar,
                             shape = CircleShape,
                             color = if (puedeEnviar) (if (esNotaInterna) Color(0xFFD97706) else TeamworkBlue) else Color(0xFFCBD5E1),
@@ -602,12 +608,20 @@ fun ChatTicketScreen(
                             modifier = Modifier.size(44.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Enviar mensaje",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                if (enviandoLocal || detalleVm.enviandoMensajeChat) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "Enviar mensaje",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }

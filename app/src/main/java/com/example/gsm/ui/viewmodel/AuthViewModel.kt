@@ -51,6 +51,73 @@ class AuthViewModel(
     var errorPerfil by mutableStateOf<String?>(null)
         private set
 
+    // Estados para auto-registro exclusivo de Clientes / Empresas
+    var registrando by mutableStateOf(false)
+        private set
+
+    var errorRegistro by mutableStateOf<String?>(null)
+        private set
+
+    fun limpiarErrorRegistro() {
+        errorRegistro = null
+    }
+
+    fun registrarUsuario(
+        nombre: String,
+        correo: String,
+        empresa: String,
+        telefono: String,
+        password: String,
+        confirmarPassword: String,
+        onExito: (Usuario) -> Unit
+    ) {
+        val pass = password.trim()
+        val conf = confirmarPassword.trim()
+
+        if (pass.length < 6) {
+            errorRegistro = "La contraseña debe tener al menos 6 caracteres."
+            return
+        }
+        if (pass != conf) {
+            errorRegistro = "Las contraseñas no coinciden."
+            return
+        }
+
+        viewModelScope.launch {
+            registrando = true
+            errorRegistro = null
+
+            val resultado = usuarioRepo.registrarCliente(
+                nombre = nombre,
+                correo = correo,
+                empresa = empresa,
+                telefono = telefono,
+                password = pass
+            )
+
+            if (resultado.isSuccess) {
+                val user = resultado.getOrThrow()
+                usuarioActual = user
+                onExito(user)
+            } else {
+                errorRegistro = resultado.exceptionOrNull()?.message ?: "Error al registrar la cuenta."
+            }
+            registrando = false
+        }
+    }
+
+    fun actualizarPlanUsuario(nuevoPlan: String, cuotaTickets: Int) {
+        val actual = usuarioActual ?: return
+        viewModelScope.launch {
+            usuarioRepo.actualizarPlanSuscripcion(actual.id, nuevoPlan, cuotaTickets)
+            usuarioActual = actual.copy(
+                plan = nuevoPlan,
+                ticketsDisponibles = cuotaTickets,
+                estadoSuscripcion = "ACTIVA"
+            )
+        }
+    }
+
     fun iniciarSesion(correo: String, password: String) {
         viewModelScope.launch {
             cargando = true

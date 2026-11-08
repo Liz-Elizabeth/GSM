@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +43,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun PlanesSoporteScreen(
     usuario: Usuario,
+    authVm: com.example.gsm.ui.viewmodel.AuthViewModel? = null,
+    esModoOnboarding: Boolean = false,
+    alCompletarOnboarding: () -> Unit = {},
     alVolver: () -> Unit
 ) {
     val context = LocalContext.current
@@ -49,7 +53,11 @@ fun PlanesSoporteScreen(
     val flowRepository = remember { FlowPaymentRepository() }
 
     var planSeleccionado by remember { mutableStateOf(PlanSoporte.PRO) }
-    var planActivoUsuario by remember { mutableStateOf(PlanSoporte.PRO) }
+    var planActivoUsuario by remember {
+        mutableStateOf(
+            PlanSoporte.entries.find { it.name.equals(usuario.plan, ignoreCase = true) } ?: PlanSoporte.PRO
+        )
+    }
     var esFacturacionAnual by remember { mutableStateOf(false) }
     var mostrarModalFlow by remember { mutableStateOf(false) }
     var mensajeExitoFlow by remember { mutableStateOf<String?>(null) }
@@ -76,12 +84,19 @@ fun PlanesSoporteScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = alVolver) {
+                    IconButton(onClick = if (esModoOnboarding) alCompletarOnboarding else alVolver) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver",
                             tint = Color(0xFF0F172A)
                         )
+                    }
+                },
+                actions = {
+                    if (esModoOnboarding) {
+                        TextButton(onClick = alCompletarOnboarding) {
+                            Text("Omitir", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -235,29 +250,44 @@ fun PlanesSoporteScreen(
                     border = BorderStroke(1.dp, Color(0xFF86EFAC)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = null,
-                            tint = Color(0xFF15803D),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            text = mensajeExitoFlow ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF166534),
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(
-                            onClick = { mensajeExitoFlow = null },
-                            modifier = Modifier.size(20.dp)
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Filled.Close, contentDescription = "Cerrar", tint = Color(0xFF15803D))
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF15803D),
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                text = mensajeExitoFlow ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF166534),
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { mensajeExitoFlow = null },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "Cerrar", tint = Color(0xFF15803D))
+                            }
+                        }
+
+                        if (esModoOnboarding) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = alCompletarOnboarding,
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF15803D)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Comenzar a usar GSM Soporte", fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
@@ -637,6 +667,7 @@ fun PlanesSoporteScreen(
                             resultado.onSuccess { orden ->
                                 tokenOrdenActual = orden.token
                                 planActivoUsuario = plan
+                                authVm?.actualizarPlanUsuario(plan.name, plan.cuotaTicketsSemanales)
                                 mensajeExitoFlow = "¡Orden Flow iniciada! Plan ${plan.nombre} activo con ${plan.limiteTicketsTexto} y SLA ${plan.slaRespuesta}."
 
                                 // Abrimos pasarela segura oficial de Flow / Webpay Sandbox
@@ -649,6 +680,7 @@ fun PlanesSoporteScreen(
                                 }
                             }.onFailure {
                                 planActivoUsuario = plan
+                                authVm?.actualizarPlanUsuario(plan.name, plan.cuotaTicketsSemanales)
                                 mensajeExitoFlow = "¡Suscripción confirmada! Plan ${plan.nombre} activado exitosamente."
                             }
                         }

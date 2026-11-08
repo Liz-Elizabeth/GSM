@@ -81,6 +81,7 @@ class HistorialRepository(
 
     /**
      * Retorna el historial. Si el rol es CLIENTE, omite comentarios internos (PDF Pág. 6).
+     * Aplica deduplicación en memoria para garantizar que mensajes duplicados no se rendericen.
      */
     fun obtenerHistorial(solicitudId: Int, rolUsuario: RolUsuario): Flow<List<Historial>> {
         val flow = if (rolUsuario == RolUsuario.CLIENTE) {
@@ -88,6 +89,13 @@ class HistorialRepository(
         } else {
             historialDao.obtenerHistorialCompleto(solicitudId)
         }
-        return flow.map { lista -> lista.map { it.toDomain() } }
+        return flow.map { lista ->
+            lista
+                .distinctBy { entidad ->
+                    // Agrupa por id único de entidad si existe, o por combinación de solicitud, comentario y ventana de 3s
+                    "${entidad.solicitudId}_${entidad.comentario.trim()}_${entidad.fechaCambio / 3000L}"
+                }
+                .map { it.toDomain() }
+        }
     }
 }

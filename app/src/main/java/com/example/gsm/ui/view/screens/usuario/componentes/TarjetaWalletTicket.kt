@@ -498,7 +498,8 @@ fun TarjetaWalletTicket(
                                         "📌 *Asunto:* ${solicitud.titulo}\n" +
                                         "🏷️ *Categoría:* ${solicitud.categoria.descripcion}\n" +
                                         "📊 *Estado:* ${solicitud.estado.name}\n\n" +
-                                        "🔗 *Validación en Línea:* https://gsm-web-delta.vercel.app/seguimiento/${solicitud.codigoSeguimiento}"
+                                        "🔗 *Ticket en Línea:* https://gsm-web-delta.vercel.app/tickets/${solicitud.codigoSeguimiento}\n" +
+                                        "🌐 *Web Oficial:* https://gsm-web-delta.vercel.app/"
 
                                 QrCodeUtil.compartirQrConTexto(
                                     context = context,

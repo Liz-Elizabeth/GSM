@@ -79,8 +79,8 @@ class FlowPaymentRepository {
             "currency" to "CLP",
             "amount" to monto.toString(),
             "email" to correoPayer.ifBlank { "cliente@gsm-soporte.cl" },
-            "urlConfirmation" to "https://gsm-soporte.cl/api/flow/confirmacion",
-            "urlReturn" to "https://gsm-soporte.cl/api/flow/retorno"
+            "urlConfirmation" to "https://gsm-web-delta.vercel.app/api/flow/confirm",
+            "urlReturn" to "https://gsm-web-delta.vercel.app/api/flow/confirmacion"
         )
 
         // Generamos la firma criptográfica HMAC-SHA256

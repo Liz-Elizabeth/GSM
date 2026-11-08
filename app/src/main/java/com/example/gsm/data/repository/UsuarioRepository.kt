@@ -242,4 +242,116 @@ class UsuarioRepository(
 
     fun obtenerTodos(): Flow<List<Usuario>> =
         usuarioDao.obtenerUsuarios().map { lista -> lista.map { it.toDomain() } }
+
+    /**
+     * Auto-registro exclusivo para nuevos Clientes / Empresas desde la pantalla de bienvenida.
+     */
+    suspend fun registrarCliente(
+        nombre: String,
+        correo: String,
+        empresa: String,
+        telefono: String,
+        password: String
+    ): Result<Usuario> {
+        return try {
+            val nombreLimpio = nombre.trim()
+            val correoLimpio = correo.trim().lowercase()
+            val empresaLimpia = empresa.trim()
+            val telefonoLimpio = telefono.trim()
+            val passwordLimpia = password.trim()
+
+            require(nombreLimpio.isNotBlank()) { "Ingresa tu nombre completo." }
+            require(correoLimpio.isNotBlank() && correoLimpio.contains("@")) { "Ingresa un correo electrónico corporativo válido." }
+            require(empresaLimpia.isNotBlank()) { "Ingresa la razón social de tu empresa." }
+            require(telefonoLimpio.isNotBlank()) { "Ingresa tu teléfono de contacto." }
+            require(passwordLimpia.length >= 6) { "La contraseña debe tener al menos 6 caracteres." }
+
+            val existente = usuarioDao.obtenerUsuarioPorCorreo(correoLimpio)
+            if (existente != null) {
+                return Result.failure(IllegalArgumentException("Ya existe una cuenta registrada con este correo electrónico."))
+            }
+
+            val nuevaEntity = UsuarioEntity(
+                nombre = nombreLimpio,
+                correo = correoLimpio,
+                password = passwordLimpia,
+                rol = RolUsuario.CLIENTE.name,
+                empresa = empresaLimpia,
+                telefono = telefonoLimpio,
+                plan = "SIN_PLAN",
+                ticketsDisponibles = 0,
+                estadoSuscripcion = "PENDIENTE_PAGO",
+                activo = true,
+                debeCambiarPassword = false,
+                fechaCreacion = System.currentTimeMillis(),
+                fechaActualizacion = System.currentTimeMillis()
+            )
+
+            val nuevoId = usuarioDao.insertarUsuario(nuevaEntity)
+            val usuarioCreado = nuevaEntity.copy(id = nuevoId.toInt()).toDomain()
+
+            // Respaldo en la nube con Firestore
+            try {
+                com.example.gsm.data.remote.FirebaseClient.firestore
+                    .collection("usuarios")
+                    .document(correoLimpio)
+                    .set(
+                        mapOf(
+                            "id" to nuevoId,
+                            "nombre" to nombreLimpio,
+                            "correo" to correoLimpio,
+                            "empresa" to empresaLimpia,
+                            "telefono" to telefonoLimpio,
+                            "rol" to RolUsuario.CLIENTE.name,
+                            "plan" to "SIN_PLAN",
+                            "ticketsDisponibles" to 0,
+                            "estadoSuscripcion" to "PENDIENTE_PAGO",
+                            "fechaCreacion" to System.currentTimeMillis()
+                        )
+                    )
+            } catch (e: Exception) {
+                android.util.Log.w("UsuarioRepository", "No se pudo respaldar cliente en Firestore", e)
+            }
+
+            Result.success(usuarioCreado)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Actualiza el plan activo y abona la cuota de tickets tras el pago aprobado en Flow.
+     */
+    suspend fun actualizarPlanSuscripcion(usuarioId: Int, nuevoPlan: String, cuotaTickets: Int): Result<Unit> {
+        return try {
+            usuarioDao.actualizarPlanSuscripcion(
+                id = usuarioId,
+                plan = nuevoPlan,
+                tickets = cuotaTickets,
+                estado = "ACTIVA"
+            )
+
+            val usuarioActual = usuarioDao.obtenerUsuarioPorId(usuarioId)
+            if (usuarioActual != null) {
+                try {
+                    com.example.gsm.data.remote.FirebaseClient.firestore
+                        .collection("usuarios")
+                        .document(usuarioActual.correo)
+                        .update(
+                            mapOf(
+                                "plan" to nuevoPlan,
+                                "ticketsDisponibles" to cuotaTickets,
+                                "estadoSuscripcion" to "ACTIVA",
+                                "fechaActualizacion" to System.currentTimeMillis()
+                            )
+                        )
+                } catch (e: Exception) {
+                    android.util.Log.w("UsuarioRepository", "No se pudo actualizar plan en Firestore", e)
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

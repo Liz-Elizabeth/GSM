@@ -23,7 +23,8 @@ class WhatsAppRepository {
                 appendLine("👤 *Cliente (Ficticio):* $nombreCliente")
             }
             appendLine("⚡ *Prioridad:* ${solicitud.prioridad.name}")
-            appendLine("🔗 *Seguimiento:* https://gsm-web-delta.vercel.app/seguimiento/${solicitud.codigoSeguimiento}")
+            appendLine("🔗 *Ticket:* https://gsm-web-delta.vercel.app/tickets/${solicitud.codigoSeguimiento}")
+            appendLine("🌐 *Web GSM:* https://gsm-web-delta.vercel.app/")
             appendLine("----------------------------------")
             appendLine("Puedes consultar el estado en la app GSM con tu código único.")
         }

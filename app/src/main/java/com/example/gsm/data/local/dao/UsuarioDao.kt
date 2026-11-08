@@ -39,6 +39,9 @@ interface UsuarioDao {
     @Query("UPDATE usuarios SET password = :password, debeCambiarPassword = :debeCambiar, fechaActualizacion = :ts WHERE id = :id")
     suspend fun actualizarCredenciales(id: Int, password: String, debeCambiar: Boolean, ts: Long = System.currentTimeMillis())
 
+    @Query("UPDATE usuarios SET plan = :plan, ticketsDisponibles = :tickets, estadoSuscripcion = :estado, fechaActualizacion = :ts WHERE id = :id")
+    suspend fun actualizarPlanSuscripcion(id: Int, plan: String, tickets: Int, estado: String, ts: Long = System.currentTimeMillis())
+
     @Query("DELETE FROM usuarios WHERE id = :id")
     suspend fun eliminarUsuario(id: Int)
 

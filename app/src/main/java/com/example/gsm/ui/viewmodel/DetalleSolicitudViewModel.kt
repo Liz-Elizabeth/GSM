@@ -46,8 +46,12 @@ class DetalleSolicitudViewModel(
     var cargando by mutableStateOf(true)
         private set
 
+    var enviandoMensajeChat by mutableStateOf(false)
+        private set
+
     private var escuchaHistorial: Job? = null
     private var escuchaEvidencias: Job? = null
+    private var syncHistorialJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -59,7 +63,8 @@ class DetalleSolicitudViewModel(
 
     fun cargarDetalle(solicitudId: Int, rol: RolUsuario) {
         cargando = true
-        viewModelScope.launch {
+        syncHistorialJob?.cancel()
+        syncHistorialJob = viewModelScope.launch {
             val encontrada = repo.obtenerPorId(solicitudId)
             solicitud = encontrada
             if (encontrada != null) {
@@ -68,7 +73,7 @@ class DetalleSolicitudViewModel(
                     repo.iniciarSincronizacionHistorial(
                         codigoSeguimiento = encontrada.codigoSeguimiento,
                         solicitudIdLocal = encontrada.id,
-                        scope = viewModelScope
+                        scope = this
                     )
                 }
             }
@@ -201,8 +206,14 @@ class DetalleSolicitudViewModel(
         esInterno: Boolean = false,
         evidenciaAdjunta: String? = null
     ) {
+        if (enviandoMensajeChat) return
+        enviandoMensajeChat = true
         viewModelScope.launch {
-            repo.enviarMensajeChat(solicitudId, usuario, texto, esInterno, evidenciaAdjunta)
+            try {
+                repo.enviarMensajeChat(solicitudId, usuario, texto, esInterno, evidenciaAdjunta)
+            } finally {
+                enviandoMensajeChat = false
+            }
         }
     }
 

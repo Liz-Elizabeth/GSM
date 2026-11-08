@@ -65,7 +65,12 @@ fun AppNavigation(
         SplashScreen(onFinalizado = { mostrandoSplash = false })
     } else if (usuarioActual == null) {
         Box(modifier = modifier.fillMaxSize()) {
-            LoginScreen(authVm = authVm)
+            LoginScreen(
+                authVm = authVm,
+                onRegistroCompletado = {
+                    pantallaActual = "planes_onboarding"
+                }
+            )
         }
     } else if (usuarioActual.debeCambiarPassword) {
         Box(modifier = modifier.fillMaxSize()) {
@@ -161,8 +166,21 @@ fun AppNavigation(
 
                     "planes" -> PlanesSoporteScreen(
                         usuario = usuarioActual,
+                        authVm = authVm,
                         alVolver = {
                             pantallaActual = "wallet"
+                        }
+                    )
+
+                    "planes_onboarding" -> PlanesSoporteScreen(
+                        usuario = usuarioActual,
+                        authVm = authVm,
+                        esModoOnboarding = true,
+                        alCompletarOnboarding = {
+                            pantallaActual = "bandeja"
+                        },
+                        alVolver = {
+                            pantallaActual = "bandeja"
                         }
                     )
 
@@ -207,7 +225,7 @@ fun AppNavigation(
             }
 
             // 2. BARRA DE NAVEGACIÓN INFERIOR (Oculta en chat, nuevo ticket o planes)
-            if (pantallaActual != "chat" && pantallaActual != "planes" && pantallaActual != "crear") {
+            if (pantallaActual != "chat" && pantallaActual != "planes" && pantallaActual != "planes_onboarding" && pantallaActual != "crear") {
                 NavigationBar(
                     containerColor = Color.White
                 ) {

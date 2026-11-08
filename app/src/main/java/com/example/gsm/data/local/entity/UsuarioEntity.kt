@@ -23,6 +23,9 @@ data class UsuarioEntity(
     val medioContacto: String? = "WhatsApp", // Canal de comunicación preferente de prueba
     val serviciosAsociados: String? = null, // Ej: "Hosting, Mantenimiento Web, Soporte Técnico"
     // ----------------------------------------------
+    val plan: String = "PRO", // PLUS, PRO, MAX o SIN_PLAN
+    val ticketsDisponibles: Int = 25,
+    val estadoSuscripcion: String = "ACTIVA", // ACTIVA, PENDIENTE_PAGO, VENCIDA
     val activo: Boolean = true,
     val debeCambiarPassword: Boolean = false,
     val fechaCreacion: Long = System.currentTimeMillis(),
