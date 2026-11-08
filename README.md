@@ -8,7 +8,10 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Android](https://img.shields.io/badge/Android-API%2033%20--%2037-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com/)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Room](https://img.shields.io/badge/Room-SQLite-F58220.svg?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
+[![Room](https://img.shields.io/badge/Room-SQLite%20Encrypted-F58220.svg?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
+[![FCM Push](https://img.shields.io/badge/Firebase-FCM%20Push-FFCA28.svg?logo=firebase&logoColor=black)](https://firebase.google.com/docs/cloud-messaging)
+[![Flow](https://img.shields.io/badge/Pasarela-Flow%20Chile-00C853.svg)](https://www.flow.cl/)
+[![SQLCipher](https://img.shields.io/badge/Cifrado-SQLCipher%20256--bit-brightgreen.svg)](https://www.zetetic.net/sqlcipher/)
 [![CameraX](https://img.shields.io/badge/CameraX-ML%20Kit-FBBC04.svg?logo=google&logoColor=white)](https://developer.android.com/training/camerax)
 [![ZXing](https://img.shields.io/badge/ZXing-QR%20Engine-00A859.svg)](https://github.com/zxing/zxing)
 [![MVVM](https://img.shields.io/badge/Arquitectura-MVVM%20%2B%20KISS-success.svg)](https://developer.android.com/topic/architecture)
@@ -45,6 +48,10 @@
    - [Recuperación de Contraseñas y Edición de Perfil](#-86-recuperación-de-contraseñas-y-edición-de-perfil)
    - [Gestión de Usuarios y Creación de Cuentas por el Administrador](#-87-gestión-de-usuarios-y-creación-de-cuentas-por-el-administrador)
    - [Plataforma Web y Landing de Trazabilidad (Vercel)](#-88-plataforma-web-y-landing-de-trazabilidad-vercel)
+   - [Notificaciones Push Nativas y Firebase Cloud Messaging (FCM)](#-89-notificaciones-push-nativas-y-firebase-cloud-messaging-fcm)
+   - [Pasarela de Pagos Flow Chile y Planes SLA](#-810-pasarela-de-pagos-flow-chile-y-planes-sla)
+   - [Registro de Nuevos Clientes y Onboarding de Suscripción](#-811-registro-de-nuevos-clientes-y-onboarding-de-suscripción)
+   - [Cifrado Nativo de Base de Datos con SQLCipher](#-812-cifrado-nativo-de-base-de-datos-con-sqlcipher)
 9. [Los ViewModels explicados línea por línea](#-9-los-viewmodels-explicados-línea-por-línea)
 10. [Datos de prueba (Cuentas y tickets precargados)](#-10-datos-de-prueba-cuentas-y-tickets-precargados)
 11. [Seguridad y buenas prácticas aplicadas (OWASP + KISS)](#-11-seguridad-y-buenas-prácticas-aplicadas-owasp--kiss)
@@ -196,12 +203,15 @@ com/example/gsm/
 │   │   └── Usuario.kt                    # Cuenta en sesión
 │   └── repository/                       # Reglas de negocio y seguridad
 │       ├── EvidenciaRepository.kt        # Validación de tipos, tamaños y storage
+│       ├── FlowPaymentRepository.kt      # Pasarela de pagos Flow y simulador Vercel
 │       ├── GsmRepository.kt              # Repositorio fachada central
 │       ├── HistorialRepository.kt        # Registro de cambios y filtro notas internas
-│       ├── NotificacionRepository.kt     # Generación de alertas
+│       ├── NotificacionRepository.kt     # Generación de alertas nativas e internas
 │       ├── SolicitudLocalRepository.kt   # Cálculo de SLA y operaciones CRUD
 │       ├── UsuarioRepository.kt          # Login, cambio de claves y alta RBAC
 │       └── WhatsAppRepository.kt         # Mensajes estructurados para WhatsApp
+├── service/                              # SERVICIOS EN SEGUNDO PLANO Y PUSH
+│   └── GsmFirebaseMessagingService.kt    # Receptor FCM y notificaciones nativas
 ├── ui/                                   # CAPA DE PRESENTACIÓN (COMPOSE)
 │   ├── view/
 │   │   ├── components/                   # Componentes visuales reutilizables
@@ -239,6 +249,7 @@ com/example/gsm/
 │       └── SolicitudViewModel.kt         # Listados, búsqueda y creación
 ├── util/                                 # UTILITARIOS DEL SISTEMA
 │   ├── FileUtil.kt                       # Copia a storage privado, MIME icons y bitmap
+│   ├── GsmNotificationHelper.kt          # Canales de sistema y banners Heads-up
 │   └── QrCodeUtil.kt                     # Generador de bitmaps QR y compartir WhatsApp
 └── MainActivity.kt                       # Punto de entrada de la aplicación Android
 ```
@@ -407,6 +418,43 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 * **Enlace Oficial:** [`https://gsm-web-delta.vercel.app/`](https://gsm-web-delta.vercel.app/)
 * **Hosting e Infraestructura:** Desplegado de forma continua en **Vercel** con certificado SSL / HTTPS activo.
 * **Integración al Ecosistema:** Funciona como portal público de divulgación y presentación para pymes y empresas de servicios TI. Permite a cualquier evaluador o cliente comprender la matriz de roles, la generación de pases digitales y el flujo de resolución de solicitudes antes de instalar la app nativa en su teléfono Android.
+
+---
+
+### 🔔 8.9. Notificaciones Push Nativas y Firebase Cloud Messaging (FCM)
+* **Archivos:** [`GsmFirebaseMessagingService.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/service/GsmFirebaseMessagingService.kt) y [`GsmNotificationHelper.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/util/GsmNotificationHelper.kt)
+* **Recepción Multi-estado:** Maneja cargas remotas de Firebase Cloud Messaging tanto cuando la app está abierta (foreground), en segundo plano (background) o cerrada/terminada por el sistema.
+* **Canales Nativos de Android (API 26+):** Separa el tráfico en dos canales configurables:
+  - `gsm_channel_tickets`: Notificaciones de alta prioridad para cambios de estado, asignaciones de técnico y alertas de resolución.
+  - `gsm_channel_chat`: Mensajes directos y notas de soporte en tiempo real.
+* **Permisos Modernos (Android 13+):** Solicita reactivamente el permiso `POST_NOTIFICATIONS` en tiempo de ejecución en `MainActivity.kt`.
+* **Navegación Profunda (Deep Linking):** Al presionar una notificación emergente en la bandeja del sistema operativo, la app extrae el `solicitud_id` y abre directamente la ficha del ticket correspondiente sin pasar por menús intermedios.
+* **Disparo Local Automático:** Cada evento registrado en `NotificacionRepository.kt` activa una alerta nativa Heads-up con sonido y vibración.
+
+---
+
+### 💳 8.10. Pasarela de Pagos Flow Chile y Planes SLA
+* **Archivos:** [`FlowPaymentRepository.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/data/repository/FlowPaymentRepository.kt) y [`PlanesSoporteScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/usuario/PlanesSoporteScreen.kt)
+* **Integración Oficial Flow:** Permite contratar o renovar paquetes de soporte técnico (Plan Básico, Plan Pro y Plan Enterprise) calculando monto, orden de compra y firma digital.
+* **Apertura Segura con Android Custom Tabs:** Lanza la pasarela en una pestaña nativa segura (`androidx.browser.customtabs`) sin sacar al usuario de la aplicación.
+* **Simulador de Sandbox en Vercel:** Conectado directamente a la plataforma web oficial en Vercel para pruebas completas de pasarela (`https://gsm-web-delta.vercel.app/planes/simulador`) con webhooks de confirmación (`/api/flow/confirm` y `/api/flow/confirmacion`).
+
+---
+
+### 👤 8.11. Registro de Nuevos Clientes y Onboarding de Suscripción
+* **Archivos:** [`LoginScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/auth/LoginScreen.kt) y [`UsuarioRepository.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/data/repository/UsuarioRepository.kt)
+* **Autoregistro de Clientes:** Formulario moderno para clientes pyme solicitando nombre completo, correo corporativo, razón social, teléfono y clave con confirmación.
+* **Flujo de Suscripción Diferenciado (KISS):**
+  - **Cuentas Mock de Prueba:** Mantienen su plan `PRO` activo y tickets precargados para demostraciones académicas inmediatas.
+  - **Usuarios Nuevos:** Se inicializan con estado de suscripción `INACTIVA` y son guiados de forma natural a la pantalla de planes para contratar vía Flow.
+* **Persistencia Dinámica de Tickets:** Comprobación en `SolicitudLocalRepository.kt` que garantiza que los tickets creados por usuarios nuevos conserven su autoría (`clienteId`) en SQLite y se sincronicen con el Administrador.
+
+---
+
+### 🛡️ 8.12. Cifrado Nativo de Base de Datos con SQLCipher
+* **Archivo:** [`GsmDatabase.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/data/local/GsmDatabase.kt) y [`MainActivity.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/MainActivity.kt)
+* **Cifrado Militar AES-256 en Reposo:** La base de datos SQLite de Room se encuentra completamente cifrada en el disco del dispositivo mediante la librería nativa `SQLCipher` (`System.loadLibrary("sqlcipher")`).
+* **Protección ante Extracción de Datos:** Si alguien intenta volcar el archivo `.db` desde un teléfono rooteado o emulador, la base de datos es ilegible sin la clave de cifrado generada por la app.
 
 ---
 
@@ -600,7 +648,7 @@ La aplicación genera mensajes preformateados listos para ser compartidos a trav
 🏷️ Categoría: INCIDENTE
 ⚡ Prioridad: ALTA
 📊 Estado: ASIGNADA
-🔗 Seguimiento: https://gsm-soporte.cl/seguimiento/SOL-2026-1001
+🔗 Seguimiento: https://gsm-web-delta.vercel.app/tickets/SOL-2026-1001
 ```
 
 Junto con el texto, adjunta automáticamente la imagen PNG del código QR generado en el almacenamiento en caché mediante el `FileProvider` con la bandera `FLAG_GRANT_READ_URI_PERMISSION`.
@@ -627,6 +675,11 @@ Junto con el texto, adjunta automáticamente la imagen PNG del código QR genera
 | **Nativo 5** | Restablecimiento de contraseña y edición de perfil de usuario en SQLite | 🟢 100% |
 | **Nativo 6** | Pantalla independiente de gestión y creación de usuarios por el Administrador | 🟢 100% |
 | **Nativo 7** | Íconos vectoriales oficiales de Google (`material-icons-extended`) | 🟢 100% |
+| **Nativo 8** | Notificaciones Push Nativas en Primer y Segundo Plano con Firebase Cloud Messaging (FCM) | 🟢 100% |
+| **Nativo 9** | Canales de Notificación de Sistema (Tickets y Chat) y Permiso POST_NOTIFICATIONS (API 33+) | 🟢 100% |
+| **Nativo 10** | Pasarela de Pago Flow Chile (Custom Tabs + Simulador Vercel) y Planes de Soporte SLA | 🟢 100% |
+| **Nativo 11** | Autoregistro de Clientes Nuevos y Onboarding de Suscripciones Diferenciadas | 🟢 100% |
+| **Nativo 12** | Cifrado Militar en Reposo de Base de Datos SQLite con SQLCipher (256-bit AES) | 🟢 100% |
 
 ---
 
