@@ -1,11 +1,14 @@
 package com.example.gsm.data.repository
 
+import android.content.Context
 import com.example.gsm.data.local.dao.NotificacionDao
 import com.example.gsm.data.local.entity.NotificacionEntity
+import com.example.gsm.util.GsmNotificationHelper
 import kotlinx.coroutines.flow.Flow
 
 class NotificacionRepository(
-    private val notificacionDao: NotificacionDao
+    private val notificacionDao: NotificacionDao,
+    private val context: Context? = null
 ) {
 
     suspend fun crearNotificacion(
@@ -25,7 +28,22 @@ class NotificacionRepository(
             leida = false,
             fechaCreacion = ahora
         )
-        return notificacionDao.insertar(entidad)
+        val id = notificacionDao.insertar(entidad)
+
+        // Disparar notificación nativa Heads-up en el sistema
+        context?.let { ctx ->
+            val esChat = tipoEvento.contains("CHAT", ignoreCase = true) ||
+                    tipoEvento.contains("MENSAJE", ignoreCase = true)
+            GsmNotificationHelper.mostrarNotificacionNativa(
+                context = ctx,
+                titulo = titulo,
+                mensaje = mensaje,
+                solicitudId = solicitudId,
+                esChat = esChat
+            )
+        }
+
+        return id
     }
 
     fun obtenerPorUsuario(usuarioId: Int): Flow<List<NotificacionEntity>> =

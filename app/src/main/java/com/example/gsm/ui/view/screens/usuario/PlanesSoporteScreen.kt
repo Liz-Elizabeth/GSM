@@ -53,7 +53,12 @@ fun PlanesSoporteScreen(
     val flowRepository = remember { FlowPaymentRepository() }
 
     var planSeleccionado by remember { mutableStateOf(PlanSoporte.PRO) }
-    var planActivoUsuario by remember {
+    var tienePlanActivo by remember(usuario.estadoSuscripcion, usuario.plan) {
+        mutableStateOf(
+            usuario.estadoSuscripcion.equals("ACTIVA", ignoreCase = true) && !usuario.plan.equals("SIN_PLAN", ignoreCase = true)
+        )
+    }
+    var planActivoUsuario by remember(usuario.plan) {
         mutableStateOf(
             PlanSoporte.entries.find { it.name.equals(usuario.plan, ignoreCase = true) } ?: PlanSoporte.PRO
         )
@@ -125,119 +130,184 @@ fun PlanesSoporteScreen(
                     modifier = Modifier.padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    if (tienePlanActivo) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(planActivoUsuario.colorHex).copy(alpha = 0.25f),
-                                modifier = Modifier.size(36.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Shield,
-                                        contentDescription = null,
-                                        tint = Color(planActivoUsuario.colorHex),
-                                        modifier = Modifier.size(20.dp)
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(planActivoUsuario.colorHex).copy(alpha = 0.25f),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Shield,
+                                            contentDescription = null,
+                                            tint = Color(planActivoUsuario.colorHex),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Column {
+                                    Text(
+                                        text = "TU PLAN ACTUAL",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF94A3B8),
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        text = "${planActivoUsuario.nombre} (${planActivoUsuario.nivel})",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White
                                     )
                                 }
                             }
+
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFF10B981).copy(alpha = 0.2f),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(Color(0xFF10B981), CircleShape)
+                                    )
+                                    Text(
+                                        text = "ACTIVO",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF34D399),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = Color(0xFF1E293B))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Column {
                                 Text(
-                                    text = "TU PLAN ACTUAL",
+                                    text = "SLA de Respuesta",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF94A3B8),
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp
+                                    color = Color(0xFF94A3B8)
                                 )
                                 Text(
-                                    text = "${planActivoUsuario.nombre} (${planActivoUsuario.nivel})",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black,
+                                    text = planActivoUsuario.slaRespuesta,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                             }
-                        }
 
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF10B981).copy(alpha = 0.2f),
-                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .background(Color(0xFF10B981), CircleShape)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Cupo Mensual",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF94A3B8)
                                 )
                                 Text(
-                                    text = "ACTIVO",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF34D399),
+                                    text = planActivoUsuario.limiteTicketsTexto,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
+                                    color = Color.White
+                                )
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "Facturación",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF94A3B8)
+                                )
+                                Text(
+                                    text = "Flow Chile",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF60A5FA)
                                 )
                             }
                         }
-                    }
+                    } else {
+                        // Usuario nuevo sin suscripción activa
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.20f),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Info,
+                                            contentDescription = null,
+                                            tint = Color(0xFFF59E0B),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Column {
+                                    Text(
+                                        text = "ESTADO DE LA CUENTA",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF94A3B8),
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        text = "Sin Suscripción Activa",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White
+                                    )
+                                }
+                            }
 
-                    HorizontalDivider(color = Color(0xFF1E293B))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "SLA de Respuesta",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF94A3B8)
-                            )
-                            Text(
-                                text = planActivoUsuario.slaRespuesta,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFFF59E0B).copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "INACTIVO",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFBBF24),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Cupo Mensual",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF94A3B8)
-                            )
-                            Text(
-                                text = planActivoUsuario.limiteTicketsTexto,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "Facturación",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF94A3B8)
-                            )
-                            Text(
-                                text = "Flow Chile",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF60A5FA)
-                            )
-                        }
+                        Text(
+                            text = "Contrata un plan de soporte a continuación para activar tu cuota de tickets y tiempos de respuesta SLA con Flow.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF94A3B8)
+                        )
                     }
                 }
             }
@@ -667,6 +737,7 @@ fun PlanesSoporteScreen(
                             resultado.onSuccess { orden ->
                                 tokenOrdenActual = orden.token
                                 planActivoUsuario = plan
+                                tienePlanActivo = true
                                 authVm?.actualizarPlanUsuario(plan.name, plan.cuotaTicketsSemanales)
                                 mensajeExitoFlow = "¡Orden Flow iniciada! Plan ${plan.nombre} activo con ${plan.limiteTicketsTexto} y SLA ${plan.slaRespuesta}."
 

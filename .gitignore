@@ -53,10 +53,17 @@ secrets.properties
 # ====================================================================
 .DS_Store
 Thumbs.db
+desktop.ini
 *.log
 .claude/
 agent/
 skills-lock.json
+
+# Bases de datos SQLite locales y temporales
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
 
 # ====================================================================
 # Web App (Next.js / Node)

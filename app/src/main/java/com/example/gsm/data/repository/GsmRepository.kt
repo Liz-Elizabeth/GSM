@@ -65,9 +65,11 @@ class GsmRepository(
                 if (targetSolId <= 0) return@onEach
 
                 mensajesRemotos.forEach { msg ->
-                    // Mapeo seguro de usuarioId para respetar integridad referencial de SQLite
-                    val usuarioIdSeguro = when (msg.usuarioId) {
-                        1, 2, 3, 4, 5, 99 -> msg.usuarioId
+                    // Mapeo seguro de usuarioId para respetar integridad referencial de SQLite (Mocks y Nuevos)
+                    val usuariosMock = listOf(1, 2, 3, 4, 5, 99)
+                    val usuarioIdSeguro = when {
+                        msg.usuarioId in usuariosMock -> msg.usuarioId
+                        msg.usuarioId > 0 -> msg.usuarioId
                         else -> when (msg.perfilUsuario) {
                             RolUsuario.ADMINISTRADOR -> 2
                             RolUsuario.TECNICO -> 3

@@ -2,6 +2,7 @@ package com.example.gsm.data.repository
 
 import android.util.Log
 import com.example.gsm.data.local.dao.SolicitudDao
+import com.example.gsm.data.local.dao.UsuarioDao
 import com.example.gsm.data.local.model.ConteoPorTecnicoDto
 import com.example.gsm.data.mapper.toDomain
 import com.example.gsm.data.mapper.toEntity
@@ -21,7 +22,8 @@ import kotlin.random.Random
  * de solicitudes en la base de datos local (Room).
  */
 class SolicitudLocalRepository(
-    private val solicitudDao: SolicitudDao
+    private val solicitudDao: SolicitudDao,
+    private val usuarioDao: UsuarioDao? = null
 ) {
     suspend fun guardarOActualizar(solicitud: Solicitud) {
         runCatching {
@@ -30,10 +32,27 @@ class SolicitudLocalRepository(
                 solicitudDao.obtenerPorCodigoSeguimiento(codigoLimpio)
             } else null
 
-            // Clave foránea segura para evitar SQLiteConstraintException
+            // Lista de usuarios mock preservada intacta
             val usuariosValidos = listOf(1, 2, 3, 4, 5, 99)
-            val clienteIdSeguro = if (solicitud.clienteId in usuariosValidos) solicitud.clienteId else 1
-            val tecnicoIdSeguro = if (solicitud.tecnicoId != null && solicitud.tecnicoId in usuariosValidos) solicitud.tecnicoId else null
+
+            // Si ya existe en SQLite local, preservamos el clienteId que originó la solicitud
+            val clienteIdCandidato = if (existente != null && existente.clienteId > 0) {
+                existente.clienteId
+            } else {
+                solicitud.clienteId
+            }
+
+            // Validamos que el cliente exista en los usuarios mock o en la tabla de usuarios nuevos registrados
+            val clienteExiste = if (clienteIdCandidato > 0) {
+                clienteIdCandidato in usuariosValidos || (usuarioDao?.obtenerUsuarioPorId(clienteIdCandidato) != null)
+            } else false
+
+            val clienteIdSeguro = if (clienteExiste) clienteIdCandidato else 1
+
+            val tecnicoIdSeguro = if (solicitud.tecnicoId != null && solicitud.tecnicoId > 0) {
+                val tecExiste = solicitud.tecnicoId in usuariosValidos || (usuarioDao?.obtenerUsuarioPorId(solicitud.tecnicoId) != null)
+                if (tecExiste) solicitud.tecnicoId else null
+            } else null
 
             val solicitudSegura = solicitud.copy(
                 clienteId = clienteIdSeguro,
@@ -44,16 +63,17 @@ class SolicitudLocalRepository(
                 solicitudDao.actualizarSolicitud(
                     solicitudSegura.toEntity(esBorrador = false).copy(
                         id = existente.id,
-                        codigoSeguimiento = existente.codigoSeguimiento
+                        codigoSeguimiento = existente.codigoSeguimiento,
+                        clienteId = clienteIdSeguro
                     )
                 )
-                Log.d("FirebaseSync", "Solicitud local actualizada: ${existente.codigoSeguimiento} (ID local: ${existente.id})")
+                Log.d("FirebaseSync", "Solicitud local actualizada: ${existente.codigoSeguimiento} (ID local: ${existente.id}, clienteId: $clienteIdSeguro)")
             } else {
                 // Al insertar uno nuevo desde Firestore, usamos id = 0 para autoincremento seguro en SQLite
                 val idLocalGenerado = solicitudDao.insertarSolicitud(
                     solicitudSegura.toEntity(esBorrador = false).copy(id = 0)
                 )
-                Log.d("FirebaseSync", "Nueva solicitud insertada en Room desde Firestore: $codigoLimpio (ID: $idLocalGenerado)")
+                Log.d("FirebaseSync", "Nueva solicitud insertada en Room desde Firestore: $codigoLimpio (ID: $idLocalGenerado, clienteId: $clienteIdSeguro)")
             }
         }.onFailure { e ->
             Log.e("FirebaseSync", "Error al guardar/actualizar solicitud local ${solicitud.codigoSeguimiento}: ${e.message}", e)

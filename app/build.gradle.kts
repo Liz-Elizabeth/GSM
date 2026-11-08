@@ -101,6 +101,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.analytics)
+    implementation(libs.firebase.messaging)
     implementation(libs.kotlinxCoroutinesPlayServices)
 
     // Cifrado Local de Base de Datos SQLite / Room

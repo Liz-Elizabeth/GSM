@@ -280,7 +280,7 @@ class UsuarioRepository(
                 telefono = telefonoLimpio,
                 plan = "SIN_PLAN",
                 ticketsDisponibles = 0,
-                estadoSuscripcion = "PENDIENTE_PAGO",
+                estadoSuscripcion = "INACTIVA",
                 activo = true,
                 debeCambiarPassword = false,
                 fechaCreacion = System.currentTimeMillis(),
@@ -305,7 +305,7 @@ class UsuarioRepository(
                             "rol" to RolUsuario.CLIENTE.name,
                             "plan" to "SIN_PLAN",
                             "ticketsDisponibles" to 0,
-                            "estadoSuscripcion" to "PENDIENTE_PAGO",
+                            "estadoSuscripcion" to "INACTIVA",
                             "fechaCreacion" to System.currentTimeMillis()
                         )
                     )

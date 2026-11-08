@@ -46,6 +46,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 kotlinxCoroutinesPlayServices = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 
 # Cifrado de Base de Datos y Seguridad

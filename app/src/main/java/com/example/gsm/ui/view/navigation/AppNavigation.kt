@@ -51,15 +51,23 @@ fun AppNavigation(
     solicitudVm: SolicitudViewModel,
     detalleVm: DetalleSolicitudViewModel,
     dashboardVm: AdminDashboardViewModel,
+    solicitudIdInicial: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val usuarioActual = authVm.usuarioActual
-    var pantallaActual by remember { mutableStateOf("bandeja") }
-    var solicitudSeleccionadaId by remember { mutableIntStateOf(0) }
+    var pantallaActual by remember { mutableStateOf(if (solicitudIdInicial > 0) "detalle" else "bandeja") }
+    var solicitudSeleccionadaId by remember { mutableIntStateOf(solicitudIdInicial) }
     var origenDetalle by remember { mutableStateOf("bandeja") }
     var origenChat by remember { mutableStateOf("detalle") }
     var origenDashboard by remember { mutableStateOf("perfil") }
     var mostrandoSplash by remember { mutableStateOf(true) }
+
+    LaunchedEffect(solicitudIdInicial) {
+        if (solicitudIdInicial > 0) {
+            solicitudSeleccionadaId = solicitudIdInicial
+            pantallaActual = "detalle"
+        }
+    }
 
     if (mostrandoSplash) {
         SplashScreen(onFinalizado = { mostrandoSplash = false })
