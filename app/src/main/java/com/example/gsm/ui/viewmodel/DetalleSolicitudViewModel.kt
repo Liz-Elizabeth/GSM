@@ -43,6 +43,9 @@ class DetalleSolicitudViewModel(
     var mensaje by mutableStateOf<String?>(null)
         private set
 
+    var cargando by mutableStateOf(true)
+        private set
+
     private var escuchaHistorial: Job? = null
     private var escuchaEvidencias: Job? = null
 
@@ -55,12 +58,21 @@ class DetalleSolicitudViewModel(
     }
 
     fun cargarDetalle(solicitudId: Int, rol: RolUsuario) {
+        cargando = true
         viewModelScope.launch {
             val encontrada = repo.obtenerPorId(solicitudId)
             solicitud = encontrada
             if (encontrada != null) {
                 mensajeWhatsApp = repo.formatearMensajeWhatsApp(encontrada)
+                if (encontrada.codigoSeguimiento.isNotBlank()) {
+                    repo.iniciarSincronizacionHistorial(
+                        codigoSeguimiento = encontrada.codigoSeguimiento,
+                        solicitudIdLocal = encontrada.id,
+                        scope = viewModelScope
+                    )
+                }
             }
+            cargando = false
         }
 
         escuchaHistorial?.cancel()
@@ -104,6 +116,23 @@ class DetalleSolicitudViewModel(
         }
     }
 
+    fun actualizarInformacion(
+        solicitudId: Int,
+        nuevoTitulo: String,
+        nuevaDescripcion: String,
+        usuario: Usuario
+    ) {
+        viewModelScope.launch {
+            val res = repo.actualizarInformacionSolicitud(solicitudId, nuevoTitulo, nuevaDescripcion, usuario)
+            if (res.isSuccess) {
+                mensaje = "Solicitud actualizada correctamente."
+                cargarDetalle(solicitudId, usuario.rol)
+            } else {
+                mensaje = res.exceptionOrNull()?.message ?: "Error al actualizar."
+            }
+            }
+    }
+
     // Función ayudante para no repetir el mismo if/else en los 9 botones
     private fun ejecutarCambio(
         solicitudId: Int,
@@ -141,9 +170,39 @@ class DetalleSolicitudViewModel(
         }
     }
 
+    fun desasignarTecnico(
+        solicitudId: Int,
+        admin: Usuario,
+        motivo: String = "Técnico desasignado por el administrador"
+    ) {
+        ejecutarCambio(solicitudId, admin.rol, "Técnico desasignado correctamente") {
+            repo.desasignarTecnico(solicitudId, admin, motivo)
+        }
+    }
+
+    fun solicitarCancelacion(solicitudId: Int, cliente: Usuario, motivo: String) {
+        ejecutarCambio(solicitudId, cliente.rol, "Solicitud de cancelación enviada") {
+            repo.solicitarCancelacion(solicitudId, cliente, motivo)
+        }
+    }
+
     fun cancelar(solicitudId: Int, admin: Usuario, motivo: String) {
         ejecutarCambio(solicitudId, admin.rol, "Solicitud cancelada") {
             repo.cancelar(solicitudId, admin, motivo)
+        }
+    }
+
+    // --- MENSAJERÍA DIRECTA DE CHAT (KISS) ---
+
+    fun enviarMensajeChat(
+        solicitudId: Int,
+        usuario: Usuario,
+        texto: String,
+        esInterno: Boolean = false,
+        evidenciaAdjunta: String? = null
+    ) {
+        viewModelScope.launch {
+            repo.enviarMensajeChat(solicitudId, usuario, texto, esInterno, evidenciaAdjunta)
         }
     }
 

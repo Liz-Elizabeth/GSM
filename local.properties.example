@@ -1,0 +1,16 @@
+## GSM Soporte - Plantilla de Configuración Local y Secretos
+## Copia este archivo como 'local.properties' en tu máquina local.
+## NUNCA subas 'local.properties' ni archivos de credenciales a Git.
+
+## Rutas locales del SDK de Android
+# sdk.dir=C:\\Users\\<TuUsuario>\\AppData\\Local\\Android\\Sdk
+
+## Configuración y Claves de Appwrite Storage (Subida de Evidencias)
+APPWRITE_ENDPOINT="https://nyc.cloud.appwrite.io/v1"
+APPWRITE_PROJECT_ID="tu_project_id_de_appwrite"
+APPWRITE_BUCKET_ID="tu_bucket_id_de_appwrite"
+
+## Configuración de Pasarela Flow Chile (Suscripciones y Planes)
+FLOW_API_KEY="tu_flow_api_key"
+FLOW_SECRET_KEY="tu_flow_secret_key"
+FLOW_ENVIRONMENT="sandbox" # sandbox | production

@@ -98,7 +98,7 @@ class AdminDashboardViewModel(
     fun crearUsuario(
         nombre: String,
         correo: String,
-        password: String,
+        password: String = UsuarioRepository.DEFAULT_PASSWORD,
         rol: RolUsuario,
         empresa: String?,
         telefono: String?,
@@ -119,12 +119,56 @@ class AdminDashboardViewModel(
             )
 
             if (resultado.isSuccess) {
-                mensajeUsuario = "Usuario creado exitosamente con rol ${rol.name}."
+                mensajeUsuario = "Usuario creado exitosamente con contraseña temporal ${UsuarioRepository.DEFAULT_PASSWORD}."
                 onExito()
             } else {
                 errorUsuario = resultado.exceptionOrNull()?.message ?: "Error al registrar usuario."
             }
             creandoUsuario = false
+        }
+    }
+
+    fun alternarEstadoActivo(usuario: Usuario, admin: Usuario) {
+        viewModelScope.launch {
+            errorUsuario = null
+            mensajeUsuario = null
+            val nuevoEstado = !usuario.activo
+            val resultado = usuarioRepo.cambiarEstadoActivo(usuario.id, nuevoEstado, admin)
+            if (resultado.isSuccess) {
+                mensajeUsuario = if (nuevoEstado) {
+                    "Cuenta de ${usuario.nombre} reactivada exitosamente."
+                } else {
+                    "Cuenta de ${usuario.nombre} desactivada. El acceso ha sido revocado."
+                }
+            } else {
+                errorUsuario = resultado.exceptionOrNull()?.message ?: "Error al actualizar estado de la cuenta."
+            }
+        }
+    }
+
+    fun resetearPassword(usuario: Usuario, admin: Usuario) {
+        viewModelScope.launch {
+            errorUsuario = null
+            mensajeUsuario = null
+            val resultado = usuarioRepo.resetearPasswordPorDefecto(usuario.id, admin)
+            if (resultado.isSuccess) {
+                mensajeUsuario = "Contraseña de ${usuario.nombre} restablecida a ${UsuarioRepository.DEFAULT_PASSWORD}. Deberá cambiarla al iniciar sesión."
+            } else {
+                errorUsuario = resultado.exceptionOrNull()?.message ?: "Error al resetear contraseña."
+            }
+        }
+    }
+
+    fun eliminarUsuario(usuario: Usuario, admin: Usuario) {
+        viewModelScope.launch {
+            errorUsuario = null
+            mensajeUsuario = null
+            val resultado = usuarioRepo.eliminarUsuario(usuario.id, admin)
+            if (resultado.isSuccess) {
+                mensajeUsuario = "Cuenta de ${usuario.nombre} eliminada del sistema."
+            } else {
+                errorUsuario = resultado.exceptionOrNull()?.message ?: "Error al eliminar usuario."
+            }
         }
     }
 

@@ -16,6 +16,7 @@ fun UsuarioEntity.toDomain() = Usuario(
     empresa = empresa,
     telefono = telefono,
     activo = activo,
+    debeCambiarPassword = debeCambiarPassword,
     fechaCreacion = fechaCreacion,
     fechaActualizacion = fechaActualizacion
 )
@@ -31,6 +32,7 @@ fun Usuario.toEntity() = UsuarioEntity(
     medioContacto = "WhatsApp",
     serviciosAsociados = null,
     activo = activo,
+    debeCambiarPassword = debeCambiarPassword,
     fechaCreacion = fechaCreacion,
     fechaActualizacion = fechaActualizacion
 )

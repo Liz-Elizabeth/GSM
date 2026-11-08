@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
+import com.example.gsm.security.SecurityKeyManager
 import com.example.gsm.data.local.dao.EvidenciaDao
 import com.example.gsm.data.local.dao.HistorialDao
 import com.example.gsm.data.local.dao.NotificacionDao
@@ -26,7 +30,7 @@ import kotlinx.coroutines.launch
         EvidenciaEntity::class,
         NotificacionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class GsmDatabase : RoomDatabase() {
@@ -38,16 +42,58 @@ abstract class GsmDatabase : RoomDatabase() {
     abstract fun notificacionDao(): NotificacionDao
 
     companion object {
+        init {
+            try {
+                System.loadLibrary("sqlcipher")
+            } catch (t: Throwable) {
+                android.util.Log.e("GsmDatabase", "Error inicializando libreria nativa sqlcipher", t)
+            }
+        }
+
         @Volatile
         private var INSTANCE: GsmDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE usuarios ADD COLUMN debeCambiarPassword INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): GsmDatabase {
+            try {
+                System.loadLibrary("sqlcipher")
+            } catch (_: Throwable) {}
             return INSTANCE ?: synchronized(this) {
+                val appContext = context.applicationContext
+
+                // Detección y migración transparente de bases de datos heredadas sin cifrado
+                val dbFile = appContext.getDatabasePath("gsm_database.db")
+                if (dbFile.exists()) {
+                    try {
+                        val header = ByteArray(16)
+                        java.io.FileInputStream(dbFile).use { it.read(header) }
+                        val headerStr = String(header, java.nio.charset.StandardCharsets.US_ASCII)
+                        if (headerStr.startsWith("SQLite format 3")) {
+                            android.util.Log.w("GsmDatabase", "Detectada base de datos previa sin cifrado. Recreando como base segura SQLCipher...")
+                            appContext.deleteDatabase("gsm_database.db")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("GsmDatabase", "No se pudo verificar cabecera de la base de datos previa", e)
+                    }
+                }
+
+                val passphrase = SecurityKeyManager.obtenerPassphrase(appContext)
+                val supportFactory = SupportOpenHelperFactory(passphrase)
+
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    appContext,
                     GsmDatabase::class.java,
                     "gsm_database.db"
-                ).build()
+                )
+                    .openHelperFactory(supportFactory)
+                    .addMigrations(MIGRATION_1_2)
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
 
                 // Cargamos los datos ficticios (mock) en segundo plano si la base está vacía
@@ -112,6 +158,26 @@ abstract class GsmDatabase : RoomDatabase() {
                     rol = "TECNICO",
                     empresa = "GSM Área Desarrollo Web",
                     telefono = "+56900004444",
+                    medioContacto = "WhatsApp"
+                ),
+                UsuarioEntity(
+                    id = 5,
+                    nombre = "Carlos Ramos (Técnico Redes)",
+                    correo = "carlos@gsm.cl",
+                    password = "1234",
+                    rol = "TECNICO",
+                    empresa = "GSM Área Infraestructura",
+                    telefono = "+56900005555",
+                    medioContacto = "WhatsApp"
+                ),
+                UsuarioEntity(
+                    id = 99,
+                    nombre = "Administrador GSM (Web)",
+                    correo = "adminweb@gsm.cl",
+                    password = "1234",
+                    rol = "ADMINISTRADOR",
+                    empresa = "GSM Servicios Digitales",
+                    telefono = "+56900009999",
                     medioContacto = "WhatsApp"
                 )
             )

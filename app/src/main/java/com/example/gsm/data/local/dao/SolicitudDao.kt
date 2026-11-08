@@ -30,8 +30,11 @@ interface SolicitudDao {
     fun observarSolicitudPorId(id: Int): Flow<SolicitudEntity?>
 
     // Seguimiento vía WhatsApp (PDF Pág. 13)
-    @Query("SELECT * FROM solicitudes WHERE codigoSeguimiento = :codigo LIMIT 1")
+    @Query("SELECT * FROM solicitudes WHERE UPPER(TRIM(codigoSeguimiento)) = UPPER(TRIM(:codigo)) LIMIT 1")
     suspend fun obtenerPorCodigoSeguimiento(codigo: String): SolicitudEntity?
+
+    @Query("UPDATE solicitudes SET titulo = :titulo, descripcion = :descripcion, fechaActualizacion = :ts WHERE id = :solicitudId")
+    suspend fun actualizarInformacion(solicitudId: Int, titulo: String, descripcion: String, ts: Long = System.currentTimeMillis())
 
     // Borradores del cliente (PDF Pág. 6)
     @Query("SELECT * FROM solicitudes WHERE clienteId = :clienteId AND esBorrador = 1 ORDER BY fechaActualizacion DESC")
@@ -127,6 +130,9 @@ interface SolicitudDao {
 
     @Query("UPDATE solicitudes SET tecnicoId = :tecnicoId, estado = 'ASIGNADA', fechaActualizacion = :ts WHERE id = :solicitudId")
     suspend fun asignarTecnico(solicitudId: Int, tecnicoId: Int, ts: Long = System.currentTimeMillis())
+
+    @Query("UPDATE solicitudes SET tecnicoId = NULL, estado = 'EN_REVISION', fechaActualizacion = :ts WHERE id = :solicitudId")
+    suspend fun desasignarTecnico(solicitudId: Int, ts: Long = System.currentTimeMillis())
 
     @Query("UPDATE solicitudes SET estado = :nuevoEstado, fechaActualizacion = :ts WHERE id = :solicitudId")
     suspend fun actualizarEstado(solicitudId: Int, nuevoEstado: String, ts: Long = System.currentTimeMillis())

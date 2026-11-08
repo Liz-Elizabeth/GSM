@@ -1,15 +1,68 @@
+# ====================================================================
+# Android Studio & IntelliJ IDEA
+# ====================================================================
 *.iml
 .gradle
+.idea/
+.kotlin/
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
+*/local.properties
+local.properties
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+*.hprof
+
+# ====================================================================
+# Android Build Outputs & Caches
+# ====================================================================
+build/
+*/build/
+/build
+app/build/
+*.apk
+*.aab
+
+# ====================================================================
+# Credenciales, Secretos y Llaves de Firma (NUNCA SUBIR A GIT)
+# ====================================================================
+# Google Services & Firebase
+google-services.json
+*/google-services.json
+GoogleService-Info.plist
+*/GoogleService-Info.plist
+
+# Keystores y Certificados de Firma
+*.jks
+*.keystore
+*.key
+*.p8
+*.p12
+*.pem
+*.pk8
+
+# Secretos Locales y Variables de Entorno
+secrets.properties
+*/secrets.properties
+*.env
+*.env.*
+*.env.local
+
+# ====================================================================
+# Herramientas de Desarrollo y Logs
+# ====================================================================
+.DS_Store
+Thumbs.db
+*.log
+.claude/
+agent/
+skills-lock.json
+
+# ====================================================================
+# Web App (Next.js / Node)
+# ====================================================================
+web/node_modules/
+web/.next/
+web/.env*
+web/out/
+web/build/

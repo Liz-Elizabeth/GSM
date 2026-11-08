@@ -9,6 +9,7 @@ data class Usuario(
     val empresa: String? = null,
     val telefono: String? = null,
     val activo: Boolean = true,
+    val debeCambiarPassword: Boolean = false,
     val fechaCreacion: Long = System.currentTimeMillis(),
     val fechaActualizacion: Long = System.currentTimeMillis()
 )

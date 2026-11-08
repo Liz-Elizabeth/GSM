@@ -33,6 +33,15 @@ interface UsuarioDao {
     @Query("SELECT * FROM usuarios WHERE correo = :correo AND password = :password AND activo = 1 LIMIT 1")
     suspend fun autenticar(correo: String, password: String): UsuarioEntity?
 
+    @Query("UPDATE usuarios SET activo = :activo, fechaActualizacion = :ts WHERE id = :id")
+    suspend fun cambiarEstadoActivo(id: Int, activo: Boolean, ts: Long = System.currentTimeMillis())
+
+    @Query("UPDATE usuarios SET password = :password, debeCambiarPassword = :debeCambiar, fechaActualizacion = :ts WHERE id = :id")
+    suspend fun actualizarCredenciales(id: Int, password: String, debeCambiar: Boolean, ts: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM usuarios WHERE id = :id")
+    suspend fun eliminarUsuario(id: Int)
+
     // Listado de técnicos disponibles para asignación
     @Query("SELECT * FROM usuarios WHERE rol = 'TECNICO' AND activo = 1 ORDER BY nombre ASC")
     fun obtenerTecnicosDisponibles(): Flow<List<UsuarioEntity>>

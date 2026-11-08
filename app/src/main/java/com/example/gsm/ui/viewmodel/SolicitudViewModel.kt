@@ -23,6 +23,20 @@ class SolicitudViewModel(
     var listaSolicitudes by mutableStateOf<List<Solicitud>>(emptyList())
         private set
 
+    val solicitudesActivas: List<Solicitud>
+        get() = listaSolicitudes.filter { sol ->
+            sol.estado != EstadoSolicitud.CANCELADA &&
+            sol.estado != EstadoSolicitud.CERRADA &&
+            !(sol.estado == EstadoSolicitud.RESUELTA && sol.conformidadCliente == true)
+        }
+
+    val solicitudesArchivadas: List<Solicitud>
+        get() = listaSolicitudes.filter { sol ->
+            sol.estado == EstadoSolicitud.CANCELADA ||
+            sol.estado == EstadoSolicitud.CERRADA ||
+            (sol.estado == EstadoSolicitud.RESUELTA && sol.conformidadCliente == true)
+        }
+
     var estadoFiltro by mutableStateOf<EstadoSolicitud?>(null)
         private set
 
@@ -47,6 +61,9 @@ class SolicitudViewModel(
     var mensaje by mutableStateOf<String?>(null)
         private set
 
+    var cargando by mutableStateOf(false)
+        private set
+
     // Guarda la búsqueda actual para cerrarla antes de abrir una nueva
     private var busquedaActual: Job? = null
     private var escuchaNotificaciones: Job? = null
@@ -56,6 +73,7 @@ class SolicitudViewModel(
         busquedaActual?.cancel()
 
         busquedaActual = viewModelScope.launch {
+            cargando = true
             val idCliente = if (usuario.rol == RolUsuario.CLIENTE) usuario.id else clienteFiltroId
             val idTecnico = if (usuario.rol == RolUsuario.TECNICO) usuario.id else tecnicoFiltroId
 
@@ -72,6 +90,7 @@ class SolicitudViewModel(
 
             flujo.collect { lista ->
                 listaSolicitudes = filtrarPorBusquedaYRol(lista, usuario)
+                cargando = false
             }
         }
 

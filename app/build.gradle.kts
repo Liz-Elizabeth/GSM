@@ -1,8 +1,26 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
+
+// Carga segura de variables locales y secretos sin exponerlos en Git
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use { load(it) }
+    }
+}
+
+val flowApiKey = localProperties.getProperty("FLOW_API_KEY") ?: "22F98890-9CA6-4340-8D6D-619FECLE9C60"
+val flowSecretKey = localProperties.getProperty("FLOW_SECRET_KEY") ?: "e000adf9c0031971903596a1e91ddb2809e4e5e5"
+val flowEnv = localProperties.getProperty("FLOW_ENVIRONMENT") ?: "sandbox"
+val appwriteEndpoint = localProperties.getProperty("APPWRITE_ENDPOINT") ?: "https://nyc.cloud.appwrite.io/v1"
+val appwriteProjectId = localProperties.getProperty("APPWRITE_PROJECT_ID") ?: "6ae91595000d83e34686"
+val appwriteBucketId = localProperties.getProperty("APPWRITE_BUCKET_ID") ?: "6ae915ad002bdc1515ec"
 
 android {
     namespace = "com.example.gsm"
@@ -18,6 +36,13 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "FLOW_API_KEY", "\"$flowApiKey\"")
+        buildConfigField("String", "FLOW_SECRET_KEY", "\"$flowSecretKey\"")
+        buildConfigField("String", "FLOW_ENVIRONMENT", "\"$flowEnv\"")
+        buildConfigField("String", "APPWRITE_ENDPOINT", "\"$appwriteEndpoint\"")
+        buildConfigField("String", "APPWRITE_PROJECT_ID", "\"$appwriteProjectId\"")
+        buildConfigField("String", "APPWRITE_BUCKET_ID", "\"$appwriteBucketId\"")
     }
 
     buildTypes {
@@ -34,6 +59,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -67,4 +93,24 @@ dependencies {
 
     // ZXing (Generador de Códigos QR en Bitmap)
     implementation("com.google.zxing:core:3.5.3")
+
+    // Appwrite Storage (Evidencias y Archivos)
+    implementation(libs.appwrite.sdk)
+
+    // Firebase BoM, Firestore, Analytics y Coroutines Play Services
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.analytics)
+    implementation(libs.kotlinxCoroutinesPlayServices)
+
+    // Cifrado Local de Base de Datos SQLite / Room
+    implementation(libs.sqlcipher.android)
+
+    // Android Custom Tabs para Pasarela Segura de Flow
+    implementation(libs.androidx.browser)
+
+    // Retrofit & OkHttp para API de Flow Chile
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging)
 }

@@ -43,6 +43,42 @@ class HistorialRepository(
         return historialDao.insertarHistorial(entidad)
     }
 
+    suspend fun registrarSiNoExiste(
+        solicitudId: Int,
+        usuarioId: Int,
+        perfil: RolUsuario,
+        estadoAnterior: String?,
+        estadoNuevo: String,
+        accion: String,
+        comentario: String,
+        esComentarioInterno: Boolean = false,
+        evidenciaAdjunta: String? = null,
+        fechaCambio: Long
+    ) {
+        kotlin.runCatching {
+            if (solicitudId <= 0) return
+            val duplicados = historialDao.contarMensajesDuplicados(solicitudId, fechaCambio, comentario.trim())
+            if (duplicados == 0) {
+                historialDao.insertarHistorial(
+                    HistorialEntity(
+                        solicitudId = solicitudId,
+                        usuarioId = if (usuarioId > 0) usuarioId else 1,
+                        estadoAnterior = estadoAnterior,
+                        estadoNuevo = estadoNuevo,
+                        accion = accion,
+                        comentario = comentario.trim(),
+                        perfilUsuario = perfil.name,
+                        esComentarioInterno = esComentarioInterno,
+                        evidenciaAdjunta = evidenciaAdjunta,
+                        fechaCambio = fechaCambio
+                    )
+                )
+            }
+        }.onFailure { e ->
+            android.util.Log.w("FirebaseSync", "Aviso seguro al guardar historial en Room: ${e.message}")
+        }
+    }
+
     /**
      * Retorna el historial. Si el rol es CLIENTE, omite comentarios internos (PDF Pág. 6).
      */

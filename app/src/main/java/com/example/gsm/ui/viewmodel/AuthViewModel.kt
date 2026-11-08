@@ -34,6 +34,13 @@ class AuthViewModel(
     var errorRecuperacion by mutableStateOf<String?>(null)
         private set
 
+    // Estados para cambio obligatorio de contraseña (primer login tras reset o creación)
+    var cambiandoPasswordObligatorio by mutableStateOf(false)
+        private set
+
+    var errorPasswordObligatoria by mutableStateOf<String?>(null)
+        private set
+
     // Estados para edición de perfil de usuario (KISS)
     var guardandoPerfil by mutableStateOf(false)
         private set
@@ -108,6 +115,48 @@ class AuthViewModel(
         recuperandoPassword = false
     }
 
+    fun cambiarPasswordObligatorio(
+        nuevaPassword: String,
+        confirmacion: String,
+        onExito: () -> Unit = {}
+    ) {
+        val actual = usuarioActual ?: return
+        val passLimpia = nuevaPassword.trim()
+        val confLimpia = confirmacion.trim()
+
+        if (passLimpia.length < 4) {
+            errorPasswordObligatoria = "La nueva contraseña debe tener al menos 4 caracteres."
+            return
+        }
+        if (passLimpia == UsuarioRepository.DEFAULT_PASSWORD) {
+            errorPasswordObligatoria = "Por seguridad, la contraseña no puede ser la clave por defecto (${UsuarioRepository.DEFAULT_PASSWORD})."
+            return
+        }
+        if (passLimpia != confLimpia) {
+            errorPasswordObligatoria = "Las contraseñas no coinciden."
+            return
+        }
+
+        viewModelScope.launch {
+            cambiandoPasswordObligatorio = true
+            errorPasswordObligatoria = null
+
+            val resultado = usuarioRepo.completarCambioPasswordObligatorio(actual.id, passLimpia)
+            if (resultado.isSuccess) {
+                usuarioActual = resultado.getOrNull()
+                onExito()
+            } else {
+                errorPasswordObligatoria = resultado.exceptionOrNull()?.message ?: "Error al actualizar contraseña."
+            }
+            cambiandoPasswordObligatorio = false
+        }
+    }
+
+    fun limpiarEstadoPasswordObligatoria() {
+        errorPasswordObligatoria = null
+        cambiandoPasswordObligatorio = false
+    }
+
     fun actualizarPerfil(nombre: String, telefono: String?, empresa: String?, onExito: () -> Unit = {}) {
         val actual = usuarioActual ?: return
         val nombreLimpio = nombre.trim()
@@ -154,6 +203,7 @@ class AuthViewModel(
         usuarioActual = null
         mensajeError = null
         limpiarEstadoRecuperacion()
+        limpiarEstadoPasswordObligatoria()
         limpiarMensajesPerfil()
     }
 }

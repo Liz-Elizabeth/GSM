@@ -17,8 +17,13 @@ class UsuarioRepository(
     private val usuarioDao: UsuarioDao
 ) {
 
+    companion object {
+        const val DEFAULT_PASSWORD = "GSMPass12345"
+    }
+
     /**
-     * Autentica un usuario validando que los campos no estén vacíos (OWASP Input Validation).
+     * Autentica un usuario validando credenciales y estado de cuenta (OWASP Input Validation).
+     * Si la cuenta fue desactivada por el administrador, entrega un mensaje explicativo claro.
      */
     suspend fun autenticar(correo: String, password: String): Result<Usuario> {
         return try {
@@ -29,12 +34,20 @@ class UsuarioRepository(
                 "Debes ingresar correo y contraseña."
             }
 
-            val entity = usuarioDao.autenticar(correoLimpio, passwordLimpia)
-            if (entity != null) {
-                Result.success(entity.toDomain())
-            } else {
-                Result.failure(IllegalArgumentException("Credenciales incorrectas o cuenta inactiva."))
+            val entity = usuarioDao.obtenerUsuarioPorCorreo(correoLimpio)
+            if (entity == null) {
+                return Result.failure(IllegalArgumentException("No existe ninguna cuenta registrada con este correo."))
             }
+
+            if (entity.password != passwordLimpia) {
+                return Result.failure(IllegalArgumentException("Contraseña incorrecta."))
+            }
+
+            if (!entity.activo) {
+                return Result.failure(IllegalArgumentException("Tu cuenta ha sido desactivada por el administrador. Contacta a soporte."))
+            }
+
+            Result.success(entity.toDomain())
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -56,6 +69,7 @@ class UsuarioRepository(
                 usuarioDao.actualizarUsuario(
                     usuarioEntity.copy(
                         password = passwordLimpia,
+                        debeCambiarPassword = false,
                         fechaActualizacion = System.currentTimeMillis()
                     )
                 )
@@ -85,11 +99,12 @@ class UsuarioRepository(
 
     /**
      * Da de alta un nuevo usuario y su rol RBAC (uso por Administrador).
+     * Por defecto asigna la contraseña GSMPass12345 y marca debeCambiarPassword = true.
      */
     suspend fun crearUsuario(
         nombre: String,
         correo: String,
-        password: String,
+        password: String = DEFAULT_PASSWORD,
         rol: RolUsuario,
         empresa: String?,
         telefono: String?
@@ -97,7 +112,7 @@ class UsuarioRepository(
         return try {
             val nombreLimpio = nombre.trim()
             val correoLimpio = correo.trim().lowercase()
-            val passwordLimpia = password.trim()
+            val passwordLimpia = password.trim().ifBlank { DEFAULT_PASSWORD }
 
             require(nombreLimpio.isNotBlank()) { "El nombre es obligatorio." }
             require(correoLimpio.isNotBlank() && correoLimpio.contains("@")) { "Ingresa un correo electrónico válido." }
@@ -117,11 +132,95 @@ class UsuarioRepository(
                     empresa = empresa?.trim()?.ifBlank { null },
                     telefono = telefono?.trim()?.ifBlank { null },
                     activo = true,
+                    debeCambiarPassword = true,
                     fechaCreacion = System.currentTimeMillis(),
                     fechaActualizacion = System.currentTimeMillis()
                 )
             )
             Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * El Administrador restablece la contraseña de un usuario a la contraseña por defecto GSMPass12345.
+     * Marca debeCambiarPassword = true para que el usuario sea obligado a renovarla al ingresar.
+     */
+    suspend fun resetearPasswordPorDefecto(usuarioId: Int, admin: Usuario): Result<Unit> {
+        return try {
+            require(admin.rol == RolUsuario.ADMINISTRADOR) {
+                "Acceso denegado: Solo el administrador puede resetear contraseñas."
+            }
+            usuarioDao.actualizarCredenciales(
+                id = usuarioId,
+                password = DEFAULT_PASSWORD,
+                debeCambiar = true
+            )
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * El Administrador activa o desactiva (soft delete) una cuenta de usuario.
+     * No permite que el administrador desactive su propia cuenta en sesión.
+     */
+    suspend fun cambiarEstadoActivo(usuarioId: Int, activo: Boolean, admin: Usuario): Result<Unit> {
+        return try {
+            require(admin.rol == RolUsuario.ADMINISTRADOR) {
+                "Acceso denegado: Solo el administrador puede modificar el estado de las cuentas."
+            }
+            require(admin.id != usuarioId) {
+                "No puedes desactivar tu propia cuenta de administrador."
+            }
+            usuarioDao.cambiarEstadoActivo(usuarioId, activo)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * El Administrador elimina permanentemente una cuenta de usuario.
+     * No permite que el administrador elimine su propia cuenta en sesión.
+     */
+    suspend fun eliminarUsuario(usuarioId: Int, admin: Usuario): Result<Unit> {
+        return try {
+            require(admin.rol == RolUsuario.ADMINISTRADOR) {
+                "Acceso denegado: Solo el administrador puede eliminar cuentas."
+            }
+            require(admin.id != usuarioId) {
+                "No puedes eliminar tu propia cuenta de administrador."
+            }
+            usuarioDao.eliminarUsuario(usuarioId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Actualiza la contraseña obligatoria por una nueva elegida por el usuario
+     * y remueve el flag debeCambiarPassword.
+     */
+    suspend fun completarCambioPasswordObligatorio(usuarioId: Int, nuevaPassword: String): Result<Usuario> {
+        return try {
+            val passLimpia = nuevaPassword.trim()
+            require(passLimpia.length >= 4) { "La nueva contraseña debe tener al menos 4 caracteres." }
+            require(passLimpia != DEFAULT_PASSWORD) { "Por seguridad, la nueva contraseña no puede ser la clave por defecto ($DEFAULT_PASSWORD)." }
+
+            usuarioDao.actualizarCredenciales(
+                id = usuarioId,
+                password = passLimpia,
+                debeCambiar = false
+            )
+
+            val actualizado = usuarioDao.obtenerUsuarioPorId(usuarioId)
+                ?: throw IllegalStateException("Usuario no encontrado.")
+
+            Result.success(actualizado.toDomain())
         } catch (e: Exception) {
             Result.failure(e)
         }

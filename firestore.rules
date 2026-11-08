@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Reglas para Solicitudes y el Chat en Tiempo Real
+    match /solicitudes/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

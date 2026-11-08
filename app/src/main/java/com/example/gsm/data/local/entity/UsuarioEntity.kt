@@ -24,6 +24,7 @@ data class UsuarioEntity(
     val serviciosAsociados: String? = null, // Ej: "Hosting, Mantenimiento Web, Soporte Técnico"
     // ----------------------------------------------
     val activo: Boolean = true,
+    val debeCambiarPassword: Boolean = false,
     val fechaCreacion: Long = System.currentTimeMillis(),
     val fechaActualizacion: Long = System.currentTimeMillis()
 )

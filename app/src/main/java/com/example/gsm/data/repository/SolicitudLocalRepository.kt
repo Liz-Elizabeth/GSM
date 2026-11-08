@@ -1,5 +1,6 @@
 package com.example.gsm.data.repository
 
+import android.util.Log
 import com.example.gsm.data.local.dao.SolicitudDao
 import com.example.gsm.data.local.model.ConteoPorTecnicoDto
 import com.example.gsm.data.mapper.toDomain
@@ -19,18 +20,59 @@ import kotlin.random.Random
  * Sub-repositorio encargado exclusivamente de la persistencia y lectura
  * de solicitudes en la base de datos local (Room).
  */
-
-
 class SolicitudLocalRepository(
     private val solicitudDao: SolicitudDao
 ) {
-    suspend fun insertar(solicitud: Solicitud, esBorrador: Boolean = false): Long{
+    suspend fun guardarOActualizar(solicitud: Solicitud) {
+        runCatching {
+            val codigoLimpio = solicitud.codigoSeguimiento.trim().uppercase()
+            val existente = if (codigoLimpio.isNotBlank()) {
+                solicitudDao.obtenerPorCodigoSeguimiento(codigoLimpio)
+            } else null
+
+            // Clave foránea segura para evitar SQLiteConstraintException
+            val usuariosValidos = listOf(1, 2, 3, 4, 5, 99)
+            val clienteIdSeguro = if (solicitud.clienteId in usuariosValidos) solicitud.clienteId else 1
+            val tecnicoIdSeguro = if (solicitud.tecnicoId != null && solicitud.tecnicoId in usuariosValidos) solicitud.tecnicoId else null
+
+            val solicitudSegura = solicitud.copy(
+                clienteId = clienteIdSeguro,
+                tecnicoId = tecnicoIdSeguro
+            )
+
+            if (existente != null) {
+                solicitudDao.actualizarSolicitud(
+                    solicitudSegura.toEntity(esBorrador = false).copy(
+                        id = existente.id,
+                        codigoSeguimiento = existente.codigoSeguimiento
+                    )
+                )
+                Log.d("FirebaseSync", "Solicitud local actualizada: ${existente.codigoSeguimiento} (ID local: ${existente.id})")
+            } else {
+                // Al insertar uno nuevo desde Firestore, usamos id = 0 para autoincremento seguro en SQLite
+                val idLocalGenerado = solicitudDao.insertarSolicitud(
+                    solicitudSegura.toEntity(esBorrador = false).copy(id = 0)
+                )
+                Log.d("FirebaseSync", "Nueva solicitud insertada en Room desde Firestore: $codigoLimpio (ID: $idLocalGenerado)")
+            }
+        }.onFailure { e ->
+            Log.e("FirebaseSync", "Error al guardar/actualizar solicitud local ${solicitud.codigoSeguimiento}: ${e.message}", e)
+        }
+    }
+
+    suspend fun actualizarInformacion(id: Int, nuevoTitulo: String, nuevaDescripcion: String, ahora: Long) {
+        solicitudDao.actualizarInformacion(id, nuevoTitulo, nuevaDescripcion, ahora)
+    }
+
+    suspend fun insertar(solicitud: Solicitud, esBorrador: Boolean = false): Long {
         return solicitudDao.insertarSolicitud(solicitud.toEntity(esBorrador))
-}
-    suspend fun obtenerPorId(id:Int): Solicitud?{
+    }
+
+    suspend fun obtenerPorId(id: Int): Solicitud? {
         return solicitudDao.obtenerSolicitudPorId(id)?.toDomain()
     }
-    suspend fun obtenerPorCodigo(codigo:String): Solicitud?{
+
+    suspend fun obtenerPorCodigo(codigo: String): Solicitud? {
         return solicitudDao.obtenerPorCodigoSeguimiento(codigo.trim().uppercase())?.toDomain()
     }
 
@@ -40,7 +82,7 @@ class SolicitudLocalRepository(
         categoria: CategoriaSolicitud? = null,
         clienteId: Int? = null,
         tecnicoId: Int? = null
-    ): Flow<List<Solicitud>>{
+    ): Flow<List<Solicitud>> {
         return solicitudDao.filtrarSolicitudes(
             estado = estado?.name,
             prioridad = prioridad?.name,
@@ -86,6 +128,10 @@ class SolicitudLocalRepository(
 
     suspend fun asignarTecnico(id: Int, tecnicoId: Int, ahora: Long) {
         solicitudDao.asignarTecnico(id, tecnicoId, ahora)
+    }
+
+    suspend fun desasignarTecnico(id: Int, ahora: Long) {
+        solicitudDao.desasignarTecnico(id, ahora)
     }
 
     suspend fun registrarResolucion(id: Int, resolucion: String, ahora: Long) {
@@ -134,6 +180,4 @@ class SolicitudLocalRepository(
         }
         return desdeMs + (horas * horaMs)
     }
-
-
 }

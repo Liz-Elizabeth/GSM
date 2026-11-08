@@ -10,6 +10,11 @@ import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Solicitud
 import com.example.gsm.data.model.Usuario
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import android.util.Log
 
 /**
  * REPOSITORIO PRINCIPAL (FACHADA / COORDINADOR)
@@ -21,10 +26,139 @@ class GsmRepository(
     private val historialRepo: HistorialRepository,
     private val notificacionRepo: NotificacionRepository,
     private val whatsAppRepo: WhatsAppRepository,
-    private val evidenciaRepo: EvidenciaRepository? = null // Opcional para no romper llamadas antiguas
+    private val evidenciaRepo: EvidenciaRepository? = null,
+    private val firebaseRepo: FirebaseSolicitudRepository? = null,
+    private val appwriteStorageRepo: AppwriteStorageRepository? = null
 ) {
 
     // -------------------------------------------------------------
+    /**
+     * Sincronización bidireccional en tiempo real (Patrón KISS).
+     * Escucha en vivo las solicitudes modificadas o creadas en la Web (Firestore)
+     * y las replica en Room para que la pantalla del celular reaccione al instante.
+     */
+    fun iniciarSincronizacionBidireccional(scope: CoroutineScope) {
+        firebaseRepo?.escucharSolicitudes()
+            ?.catch { e -> Log.e("FirebaseSync", "Error en flujo de solicitudes: ${e.message}", e) }
+            ?.onEach { solicitudesRemotas ->
+                solicitudesRemotas.forEach { solicitud ->
+                    localRepo.guardarOActualizar(solicitud)
+                }
+            }
+            ?.launchIn(scope)
+    }
+
+    /**
+     * Sincronización en tiempo real del chat de un ticket (Firestore -> Room).
+     */
+    fun iniciarSincronizacionHistorial(codigoSeguimiento: String, solicitudIdLocal: Int, scope: CoroutineScope) {
+        val codigoLimpio = codigoSeguimiento.trim()
+        if (codigoLimpio.isBlank()) return
+
+        firebaseRepo?.escucharHistorialChat(codigoLimpio)
+            ?.catch { e -> Log.e("FirebaseSync", "Error en flujo historial chat: ${e.message}", e) }
+            ?.onEach { mensajesRemotos ->
+                val ticketLocal = localRepo.obtenerPorCodigo(codigoLimpio)
+                val targetSolId = ticketLocal?.id ?: solicitudIdLocal
+                if (targetSolId <= 0) return@onEach
+
+                mensajesRemotos.forEach { msg ->
+                    // Mapeo seguro de usuarioId para respetar integridad referencial de SQLite
+                    val usuarioIdSeguro = when (msg.usuarioId) {
+                        1, 2, 3, 4, 5, 99 -> msg.usuarioId
+                        else -> when (msg.perfilUsuario) {
+                            RolUsuario.ADMINISTRADOR -> 2
+                            RolUsuario.TECNICO -> 3
+                            RolUsuario.CLIENTE -> 1
+                        }
+                    }
+
+                    historialRepo.registrarSiNoExiste(
+                        solicitudId = targetSolId,
+                        usuarioId = usuarioIdSeguro,
+                        perfil = msg.perfilUsuario,
+                        estadoAnterior = msg.estadoAnterior?.name,
+                        estadoNuevo = msg.estadoNuevo.name,
+                        accion = msg.accion,
+                        comentario = msg.comentario,
+                        esComentarioInterno = msg.esComentarioInterno,
+                        evidenciaAdjunta = msg.evidenciaAdjunta,
+                        fechaCambio = msg.fechaCambio
+                    )
+                }
+            }
+            ?.launchIn(scope)
+    }
+
+    private suspend fun syncFirestore(solicitudId: Int) {
+        val s = localRepo.obtenerPorId(solicitudId) ?: return
+        runCatching { firebaseRepo?.guardarSolicitud(s) }
+    }
+
+    /**
+     * Envía un mensaje conversacional limpio al ticket (KISS).
+     * Envía exactamente lo que el usuario escribió sin preformateos ni alterar estados.
+     */
+    suspend fun enviarMensajeChat(
+        solicitudId: Int,
+        usuario: Usuario,
+        texto: String,
+        esInterno: Boolean = false,
+        evidenciaAdjunta: String? = null
+    ): Result<Unit> = runCatching {
+        val mensajeLimpio = texto.trim()
+        val tieneEvidencia = !evidenciaAdjunta.isNullOrBlank()
+        require(mensajeLimpio.isNotBlank() || tieneEvidencia) { "El mensaje no puede estar vacío" }
+
+        val ahora = System.currentTimeMillis()
+        val solicitud = localRepo.obtenerPorId(solicitudId)
+            ?: throw IllegalArgumentException("Solicitud no encontrada")
+
+        // 1. Guardar en SQLite local (Room) con el texto exacto del usuario
+        historialRepo.registrarEvento(
+            solicitudId = solicitudId,
+            usuarioId = usuario.id,
+            perfil = usuario.rol,
+            estadoAnterior = solicitud.estado.name,
+            estadoNuevo = solicitud.estado.name,
+            accion = "MENSAJE",
+            comentario = mensajeLimpio,
+            esComentarioInterno = esInterno,
+            evidenciaAdjunta = evidenciaAdjunta,
+            ahora = ahora
+        )
+
+        // 2. Sincronizar en tiempo real con Firestore con el texto exacto
+        runCatching {
+            firebaseRepo?.enviarMensajeChat(
+                codigoSeguimiento = solicitud.codigoSeguimiento,
+                solicitudId = solicitudId,
+                usuarioId = usuario.id,
+                autorNombre = usuario.nombre,
+                autorRol = usuario.rol,
+                mensaje = mensajeLimpio,
+                esInterno = esInterno,
+                evidenciaAdjunta = evidenciaAdjunta,
+                accion = "MENSAJE",
+                fecha = ahora
+            )
+        }
+    }
+
+    suspend fun actualizarInformacionSolicitud(
+        solicitudId: Int,
+        nuevoTitulo: String,
+        nuevaDescripcion: String,
+        usuario: Usuario
+    ): Result<Unit> = runCatching {
+        require(nuevoTitulo.isNotBlank()) { "El título no puede estar vacío" }
+        require(nuevaDescripcion.isNotBlank()) { "La descripción no puede estar vacía" }
+        val actual = localRepo.obtenerPorId(solicitudId) ?: throw IllegalArgumentException("Solicitud no encontrada")
+        val ahora = System.currentTimeMillis()
+        localRepo.actualizarInformacion(solicitudId, nuevoTitulo.trim(), nuevaDescripcion.trim(), ahora)
+        syncFirestore(solicitudId)
+    }
+
     // 1. FLUJOS DE CREACIÓN (Con trazabilidad, validación y código único)
     // -------------------------------------------------------------
 
@@ -101,6 +235,14 @@ class GsmRepository(
                 )
             }
 
+            // Sincronización transparente con Firebase (Offline-First)
+            if (!esBorrador) {
+                runCatching { firebaseRepo?.guardarSolicitud(solicitudGuardada) }
+            }
+            if (!nombreArchivoEvidencia.isNullOrBlank() && !uriEvidencia.isNullOrBlank()) {
+                runCatching { appwriteStorageRepo?.subirEvidencia(nombreArchivoEvidencia, uriEvidencia) }
+            }
+
             Result.success(solicitudGuardada)
         } catch (e: Exception) {
             Result.failure(e)
@@ -165,6 +307,7 @@ class GsmRepository(
             tipoEvento = "CAMBIO_PRIORIDAD",
             ahora = ahora
         )
+        syncFirestore(solicitudId)
     }
 
     /**
@@ -204,6 +347,54 @@ class GsmRepository(
             tipoEvento = "ASIGNACION",
             ahora = ahora
         )
+        syncFirestore(solicitudId)
+    }
+
+    /**
+     * El Administrador remueve o desasigna al técnico responsable del ticket.
+     * El ticket revierte su estado a EN_REVISION para permitir una nueva asignación.
+     */
+    suspend fun desasignarTecnico(
+        solicitudId: Int,
+        admin: Usuario,
+        motivo: String = "Técnico desasignado por el administrador."
+    ): Result<Unit> = runCatching {
+        require(admin.rol == RolUsuario.ADMINISTRADOR) {
+            "Acceso denegado: Solo el administrador puede desasignar responsables técnicos."
+        }
+        val ahora = System.currentTimeMillis()
+        val solicitud = localRepo.obtenerPorId(solicitudId)
+            ?: throw IllegalArgumentException("Solicitud no encontrada.")
+
+        require(solicitud.tecnicoId != null) {
+            "La solicitud no tiene ningún técnico asignado para remover."
+        }
+
+        val tecnicoAnteriorId = solicitud.tecnicoId
+
+        localRepo.desasignarTecnico(solicitudId, ahora)
+
+        historialRepo.registrarEvento(
+            solicitudId = solicitudId,
+            usuarioId = admin.id,
+            perfil = admin.rol,
+            estadoAnterior = solicitud.estado.name,
+            estadoNuevo = EstadoSolicitud.EN_REVISION.name,
+            accion = "DESASIGNACION",
+            comentario = motivo,
+            ahora = ahora
+        )
+
+        notificacionRepo.crearNotificacion(
+            usuarioDestinoId = tecnicoAnteriorId,
+            solicitudId = solicitudId,
+            titulo = "Solicitud Desasignada",
+            mensaje = "Has sido desasignado de la solicitud #${solicitud.codigoSeguimiento}",
+            tipoEvento = "DESASIGNACION",
+            ahora = ahora
+        )
+
+        syncFirestore(solicitudId)
     }
 
     /**
@@ -248,6 +439,22 @@ class GsmRepository(
                 ahora = ahora
             )
         }
+
+        // Sincronización en tiempo real del chat con Firestore (Web y otros celulares)
+        runCatching {
+            firebaseRepo?.enviarMensajeChat(
+                codigoSeguimiento = solicitud.codigoSeguimiento,
+                solicitudId = solicitudId,
+                usuarioId = usuario.id,
+                autorNombre = usuario.nombre,
+                autorRol = usuario.rol,
+                mensaje = comentario.trim(),
+                esInterno = esInterno,
+                accion = "AVANCE",
+                fecha = ahora
+            )
+        }
+        syncFirestore(solicitudId)
     }
 
     /**
@@ -288,6 +495,7 @@ class GsmRepository(
             tipoEvento = "PENDIENTE_INFORMACION",
             ahora = ahora
         )
+        syncFirestore(solicitudId)
     }
 
     /**
@@ -297,27 +505,24 @@ class GsmRepository(
         solicitudId: Int,
         cliente: Usuario,
         respuesta: String,
-        nombreArchivoEvidencia: String? = null
+        nombreArchivoEvidencia: String? = null,
+        tipoArchivoEvidencia: String? = null,
+        tamanoArchivoEvidencia: Long? = null,
+        uriEvidencia: String? = null
     ): Result<Unit> = runCatching {
-        require(respuesta.isNotBlank()) { "Debes escribir los antecedentes solicitados." }
+        require(cliente.rol == RolUsuario.CLIENTE) {
+            "Acceso denegado: Solo el cliente titular puede aportar la información requerida."
+        }
+        require(respuesta.isNotBlank()) { "Debes ingresar una respuesta explicativa." }
 
         val ahora = System.currentTimeMillis()
         val solicitud = localRepo.obtenerPorId(solicitudId)
             ?: throw IllegalArgumentException("Solicitud no encontrada.")
 
-        require(solicitud.clienteId == cliente.id) {
-            "Acceso denegado: No puedes modificar solicitudes de otro cliente."
-        }
-
-        // Si ya tenía técnico asignado vuelve a EN_PROCESO, si no vuelve a EN_REVISION
-        val nuevoEstado = if (solicitud.tecnicoId != null) {
-            EstadoSolicitud.EN_PROCESO
-        } else {
-            EstadoSolicitud.EN_REVISION
-        }
+        val nuevoEstado = if (solicitud.tecnicoId != null) EstadoSolicitud.EN_PROCESO else EstadoSolicitud.ASIGNADA
 
         if (!nombreArchivoEvidencia.isNullOrBlank()) {
-            evidenciaRepo?.adjuntarEvidenciaFicticia(
+            evidenciaRepo?.adjuntarEvidencia(
                 solicitudId = solicitudId,
                 usuarioId = cliente.id,
                 nombreArchivo = nombreArchivoEvidencia,
@@ -334,15 +539,32 @@ class GsmRepository(
             perfil = cliente.rol,
             estadoAnterior = solicitud.estado.name,
             estadoNuevo = nuevoEstado.name,
-            accion = "APORTE_INFO",
+            accion = "RESPUESTA_INFO",
             comentario = respuesta.trim(),
             evidenciaAdjunta = nombreArchivoEvidencia,
             ahora = ahora
         )
+
+        // Sincronización en tiempo real del chat con Firestore (Web y otros celulares)
+        runCatching {
+            firebaseRepo?.enviarMensajeChat(
+                codigoSeguimiento = solicitud.codigoSeguimiento,
+                solicitudId = solicitudId,
+                usuarioId = cliente.id,
+                autorNombre = cliente.nombre,
+                autorRol = cliente.rol,
+                mensaje = respuesta.trim(),
+                esInterno = false,
+                evidenciaAdjunta = nombreArchivoEvidencia,
+                accion = "RESPUESTA_INFO",
+                fecha = ahora
+            )
+        }
+        syncFirestore(solicitudId)
     }
 
     /**
-     * El Técnico registra la solución técnica y marca como RESUELTA (Criterio 31).
+     * El Técnico ejecutor marca la solicitud como RESUELTA indicando la solución técnica (Criterio 25).
      */
     suspend fun registrarResolucion(
         solicitudId: Int,
@@ -350,9 +572,9 @@ class GsmRepository(
         solucion: String
     ): Result<Unit> = runCatching {
         require(tecnico.rol == RolUsuario.TECNICO || tecnico.rol == RolUsuario.ADMINISTRADOR) {
-            "Acceso denegado: El cliente no puede registrar una resolución técnica."
+            "Acceso denegado: Solo el ejecutor técnico puede resolver el requerimiento."
         }
-        require(solucion.isNotBlank()) { "Debes detallar la solución aplicada." }
+        require(solucion.isNotBlank()) { "Debes documentar la solución técnica aplicada." }
 
         val ahora = System.currentTimeMillis()
         val solicitud = localRepo.obtenerPorId(solicitudId)
@@ -367,7 +589,7 @@ class GsmRepository(
             estadoAnterior = solicitud.estado.name,
             estadoNuevo = EstadoSolicitud.RESUELTA.name,
             accion = "RESOLUCION",
-            comentario = "Solución: ${solucion.trim()}",
+            comentario = solucion.trim(),
             ahora = ahora
         )
 
@@ -379,32 +601,23 @@ class GsmRepository(
             tipoEvento = "RESUELTA",
             ahora = ahora
         )
+        syncFirestore(solicitudId)
     }
 
     /**
-     * El Cliente (o Admin) confirma la conformidad y cierra formalmente la solicitud (Criterios 32 y 34).
-     * Respeta restricción de Pág. 6 y 8: No se puede cerrar directamente sin estar RESUELTA.
+     * El Cliente confirma conformidad cerrando formalmente el ciclo de vida (Criterio 26 y 27).
      */
     suspend fun confirmarCierre(
         solicitudId: Int,
         usuario: Usuario,
-        conforme: Boolean
+        conforme: Boolean = true
     ): Result<Unit> = runCatching {
         require(usuario.rol == RolUsuario.CLIENTE || usuario.rol == RolUsuario.ADMINISTRADOR) {
-            "Acceso denegado: El técnico no puede cerrar definitivamente sin confirmación del cliente."
+            "Acceso denegado: Solo el cliente o el administrador pueden dar cierre de conformidad."
         }
         val ahora = System.currentTimeMillis()
         val solicitud = localRepo.obtenerPorId(solicitudId)
             ?: throw IllegalArgumentException("Solicitud no encontrada.")
-
-        require(solicitud.estado == EstadoSolicitud.RESUELTA) {
-            "Flujo inválido: Solo se puede confirmar el cierre de una solicitud que esté en estado RESUELTA."
-        }
-        if (usuario.rol == RolUsuario.CLIENTE) {
-            require(solicitud.clienteId == usuario.id) {
-                "Acceso denegado: No puedes cerrar solicitudes de otro cliente."
-            }
-        }
 
         localRepo.confirmarCierre(solicitudId, conforme, ahora)
 
@@ -418,17 +631,21 @@ class GsmRepository(
             comentario = if (conforme) "Cliente confirma conformidad con la solución." else "Cierre registrado por administración.",
             ahora = ahora
         )
+        syncFirestore(solicitudId)
     }
 
     /**
-     * El Cliente solicita la reapertura del caso cuando no está conforme o surge un problema (Criterio 33).
+     * El Cliente rechaza la resolución o solicita reapertura por disconformidad (Pág. 7).
      */
     suspend fun solicitarReapertura(
         solicitudId: Int,
         cliente: Usuario,
         motivo: String
     ): Result<Unit> = runCatching {
-        require(motivo.isNotBlank()) { "Debes indicar el motivo de la reapertura." }
+        require(cliente.rol == RolUsuario.CLIENTE) {
+            "Acceso denegado: Solo el cliente solicitante puede pedir reapertura."
+        }
+        require(motivo.isNotBlank()) { "Debes indicar el motivo por el cual solicitas reabrir el caso." }
 
         val ahora = System.currentTimeMillis()
         val solicitud = localRepo.obtenerPorId(solicitudId)
@@ -447,13 +664,63 @@ class GsmRepository(
             estadoAnterior = solicitud.estado.name,
             estadoNuevo = EstadoSolicitud.EN_REVISION.name,
             accion = "REAPERTURA",
-            comentario = "Reapertura solicitada: ${motivo.trim()}",
+            comentario = motivo.trim(),
             ahora = ahora
         )
+        syncFirestore(solicitudId)
     }
 
     /**
-     * El Administrador cancela una solicitud dejando motivo justificado (Pág. 7 y 10).
+     * El Cliente solicita la anulación/cancelación formal del ticket por equivocación o duplicidad.
+     * Respeta la regla de negocio RBAC: el cliente emite la solicitud y el Administrador la autoriza.
+     */
+    suspend fun solicitarCancelacion(
+        solicitudId: Int,
+        cliente: Usuario,
+        motivo: String
+    ): Result<Unit> = runCatching {
+        val solicitud = localRepo.obtenerPorId(solicitudId)
+            ?: throw IllegalArgumentException("Solicitud no encontrada.")
+
+        require(cliente.rol == RolUsuario.CLIENTE && solicitud.clienteId == cliente.id) {
+            "Acceso denegado: Solo el autor de la solicitud puede pedir su anulación."
+        }
+        val motivoLimpio = motivo.trim().ifBlank { "Solicitud de anulación por equivocación del cliente." }
+        val ahora = System.currentTimeMillis()
+
+        // 1. Bitácora de historial
+        historialRepo.registrarEvento(
+            solicitudId = solicitudId,
+            usuarioId = cliente.id,
+            perfil = cliente.rol,
+            estadoAnterior = solicitud.estado.name,
+            estadoNuevo = solicitud.estado.name,
+            accion = "SOLICITUD_CANCELACION",
+            comentario = "⚠️ El cliente ha solicitado anular el ticket: $motivoLimpio",
+            ahora = ahora
+        )
+
+        // 2. Chat en tiempo real para alertar de inmediato a soporte y al administrador
+        runCatching {
+            firebaseRepo?.enviarMensajeChat(
+                codigoSeguimiento = solicitud.codigoSeguimiento,
+                solicitudId = solicitudId,
+                usuarioId = cliente.id,
+                autorNombre = cliente.nombre,
+                autorRol = cliente.rol,
+                mensaje = "⚠️ He solicitado anular este ticket: $motivoLimpio",
+                esInterno = false,
+                accion = "SOLICITUD_CANCELACION",
+                fecha = ahora
+            )
+        }
+
+        syncFirestore(solicitudId)
+    }
+
+    /**
+     * Cancelar solicitud: Función exclusiva del ADMINISTRADOR (Regla RBAC estricta según rúbrica).
+     * Muta el estado a CANCELADA, guarda el motivo y lo archiva en tiempo real.
      */
     suspend fun cancelar(
         solicitudId: Int,
@@ -461,7 +728,7 @@ class GsmRepository(
         motivo: String
     ): Result<Unit> = runCatching {
         require(admin.rol == RolUsuario.ADMINISTRADOR) {
-            "Acceso denegado: Solo el administrador puede cancelar una solicitud."
+            "Acceso denegado: Solo el administrador puede cancelar una solicitud (Regla RBAC)."
         }
         require(motivo.isNotBlank()) { "Debes ingresar el motivo de cancelación." }
 
@@ -478,9 +745,10 @@ class GsmRepository(
             estadoAnterior = solicitud.estado.name,
             estadoNuevo = EstadoSolicitud.CANCELADA.name,
             accion = "CANCELACION",
-            comentario = "Motivo cancelación: ${motivo.trim()}",
+            comentario = motivo.trim(),
             ahora = ahora
         )
+        syncFirestore(solicitudId)
     }
 
     // -------------------------------------------------------------
@@ -517,7 +785,7 @@ class GsmRepository(
     ): Result<Long> {
         val repo = evidenciaRepo
             ?: return Result.failure(IllegalStateException("EvidenciaRepository no inicializado."))
-        return repo.adjuntarEvidencia(
+        val resultado = repo.adjuntarEvidencia(
             solicitudId = solicitudId,
             usuarioId = usuario.id,
             nombreArchivo = nombreArchivo,
@@ -526,6 +794,10 @@ class GsmRepository(
             uriLocal = uriLocal,
             descripcion = descripcion
         )
+        if (resultado.isSuccess && !nombreArchivo.isBlank() && !uriLocal.isNullOrBlank()) {
+            runCatching { appwriteStorageRepo?.subirEvidencia(nombreArchivo, uriLocal) }
+        }
+        return resultado
     }
 
     fun obtenerEvidencias(solicitudId: Int): Flow<List<EvidenciaEntity>>? =

@@ -37,4 +37,7 @@ interface HistorialDao {
 
     @Query("SELECT * FROM historial ORDER BY fechaCambio DESC")
     fun obtenerTodoHistorial(): Flow<List<HistorialEntity>>
+
+    @Query("SELECT COUNT(*) FROM historial WHERE solicitudId = :solicitudId AND fechaCambio = :fechaCambio AND comentario = :comentario")
+    suspend fun contarMensajesDuplicados(solicitudId: Int, fechaCambio: Long, comentario: String): Int
 }
