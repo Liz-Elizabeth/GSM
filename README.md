@@ -6,7 +6,7 @@
 *Una app Android profesional, rápida y limpia que ordena las solicitudes de soporte técnico y servicios que hoy se pierden en WhatsApp.*
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![Android](https://img.shields.io/badge/Android-API%2033%20--%2037-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com/)
+[![Android](https://img.shields.io/badge/Android-API%2026%20--%2037-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com/)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Room](https://img.shields.io/badge/Room-SQLite%20Encrypted-F58220.svg?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
 [![FCM Push](https://img.shields.io/badge/Firebase-FCM%20Push-FFCA28.svg?logo=firebase&logoColor=black)](https://firebase.google.com/docs/cloud-messaging)
@@ -59,9 +59,12 @@
 13. [Guía para desarrolladores (Cómo agregar nuevas funciones)](#-13-guía-para-desarrolladores-cómo-agregar-nuevas-funciones)
 14. [Modelo de Datos Entidad-Relación](#-14-modelo-de-datos-entidad-relación)
 15. [Integración con WhatsApp y FileProvider](#-15-integración-con-whatsapp-y-fileprovider)
-16. [Checklist Maestro de Criterios del Caso](#-16-checklist-maestro-de-criterios-del-caso)
-17. [Preguntas Frecuentes (FAQ)](#-17-preguntas-frecuentes-faq)
-18. [Autores](#-18-autores)
+16. [Endpoints, API Externa (Retrofit) y Servicios en la Nube](#-16-endpoints-api-externa-retrofit-y-servicios-en-la-nube)
+17. [Pruebas Unitarias y de Interfaz (Testing)](#-17-pruebas-unitarias-y-de-interfaz-testing)
+18. [APK Firmado, Llave `.jks` y Planificación (Trello)](#-18-apk-firmado-llave-jks-y-planificación-trello)
+19. [Checklist Maestro de Criterios del Caso](#-19-checklist-maestro-de-criterios-del-caso)
+20. [Preguntas Frecuentes (FAQ)](#-20-preguntas-frecuentes-faq)
+21. [Autores](#-21-autores)
 
 ---
 
@@ -168,90 +171,52 @@ Significa **Keep It Simple, Stupid** (Mantenlo simple y directo). En este proyec
 
 ## 📁 4. Cómo está organizado el código (Estructura de Carpetas)
 
-El código se encuentra en `app/src/main/java/com/example/gsm/` organizado por capas:
+El código se encuentra en `app/src/main/java/com/example/gsm/` (y pruebas en `app/src/test/` y `app/src/androidTest/`):
 
 ```text
-com/example/gsm/
-├── data/                                 # CAPA DE DATOS Y PERSISTENCIA
-│   ├── local/                            # SQLite mediante Room
-│   │   ├── dao/                          # Consultas SQL (Data Access Objects)
-│   │   │   ├── EvidenciaDao.kt           # Consultas para archivos adjuntos
-│   │   │   ├── HistorialDao.kt           # Consultas de auditoría y notas internas
-│   │   │   ├── NotificacionDao.kt        # Alertas del sistema
-│   │   │   ├── SolicitudDao.kt           # Búsquedas, filtros, SLA y borradores
-│   │   │   └── UsuarioDao.kt             # Cuentas, roles y contraseñas
-│   │   ├── database/
-│   │   │   └── GsmDatabase.kt            # Base de datos Room + Datos iniciales de prueba
-│   │   └── entity/                       # Tablas de SQLite
-│   │       ├── EvidenciaEntity.kt
-│   │       ├── HistorialEntity.kt
-│   │       ├── NotificacionEntity.kt
-│   │       ├── SolicitudEntity.kt
-│   │       └── UsuarioEntity.kt
-│   ├── mapper/                           # Traductores de Entity (BD) a Model (Dominio)
-│   │   ├── HistorialMapper.kt
-│   │   ├── SolicitudMapper.kt
-│   │   └── UsuarioMapper.kt
-│   ├── model/                            # Modelos de negocio y Enums de la app
-│   │   ├── CategoriaSolicitud.kt         # INCIDENTE, SOPORTE, DESARROLLO, ETC.
-│   │   ├── EstadoSolicitud.kt            # NUEVA, ASIGNADA, EN_PROCESO, RESUELTA, etc.
-│   │   ├── Historial.kt                  # Evento de auditoría
-│   │   ├── Notificacion.kt               # Alerta al usuario
-│   │   ├── PrioridadSolicitud.kt         # BAJA (168h), MEDIA (72h), ALTA (24h), CRITICA (6h)
-│   │   ├── RolUsuario.kt                 # CLIENTE, ADMINISTRADOR, TECNICO
-│   │   ├── Solicitud.kt                  # Entidad central del ticket
-│   │   └── Usuario.kt                    # Cuenta en sesión
-│   └── repository/                       # Reglas de negocio y seguridad
-│       ├── EvidenciaRepository.kt        # Validación de tipos, tamaños y storage
-│       ├── FlowPaymentRepository.kt      # Pasarela de pagos Flow y simulador Vercel
-│       ├── GsmRepository.kt              # Repositorio fachada central
-│       ├── HistorialRepository.kt        # Registro de cambios y filtro notas internas
-│       ├── NotificacionRepository.kt     # Generación de alertas nativas e internas
-│       ├── SolicitudLocalRepository.kt   # Cálculo de SLA y operaciones CRUD
-│       ├── UsuarioRepository.kt          # Login, cambio de claves y alta RBAC
-│       └── WhatsAppRepository.kt         # Mensajes estructurados para WhatsApp
-├── service/                              # SERVICIOS EN SEGUNDO PLANO Y PUSH
-│   └── GsmFirebaseMessagingService.kt    # Receptor FCM y notificaciones nativas
-├── ui/                                   # CAPA DE PRESENTACIÓN (COMPOSE)
-│   ├── view/
-│   │   ├── components/                   # Componentes visuales reutilizables
-│   │   │   ├── EncabezadoPantalla.kt     # Barra superior con botón volver
-│   │   │   ├── Formateadores.kt          # Fechas legibles en español
-│   │   │   ├── QrNoEncontradoDialog.kt   # Diálogo animado de QR no encontrado
-│   │   │   ├── QrScannerModal.kt         # Modal CameraX + ML Kit con analizador en vivo
-│   │   │   ├── TarjetaSolicitudItem.kt   # Tarjeta de ticket para listas
-│   │   │   └── VisorEvidenciaModal.kt    # Visor in-app de fotos, logs y documentos
-│   │   ├── navigation/
-│   │   │   └── AppNavigation.kt          # Barra inferior de 5 pestañas y router
-│   │   └── screens/                      # Pantallas completas
-│   │       ├── admin/
-│   │       │   ├── AdminDashboardScreen.kt   # Métricas y contadores SLA
-│   │       │   └── GestionUsuariosScreen.kt  # Gestión y alta de cuentas RBAC
-│   │       ├── auth/
-│   │       │   └── LoginScreen.kt            # Login + Recuperar contraseña + Demo 1-clic
-│   │       └── usuario/
-│   │           ├── BandejaScreen.kt          # Bandeja de entrada + Filtros + Botón QR
-│   │           ├── CrearSolicitudScreen.kt   # Alta de ticket + Adjuntos + Borradores
-│   │           ├── DetalleSolicitudScreen.kt # Ficha técnica + Chat WhatsApp + Acciones
-│   │           ├── PerfilScreen.kt           # Edición de perfil + Cerrar sesión
-│   │           ├── WalletTicketsScreen.kt    # Billetera de Pases Digitales QR
-│   │           └── componentes/              # Piezas modulares del ticket
-│   │               ├── ChatConversacionTicket.kt # Chat con notas internas
-│   │               ├── DetalleUiTokens.kt        # Colores y estilos Apple HIG
-│   │               ├── FichaResumenTicket.kt     # Header y datos clave
-│   │               ├── TarjetaWalletTicket.kt    # Pase troquelado de evento
-│   │               └── TicketCerradoCard.kt      # Banner de ticket finalizado
-│   └── viewmodel/                        # Cerebros de estado (MVVM)
-│       ├── AdminDashboardViewModel.kt    # Métricas reactivas en tiempo real
-│       ├── AuthViewModel.kt              # Sesión, perfil y restablecimiento
-│       ├── DetalleSolicitudViewModel.kt  # Conversación, cambios de estado y archivos
-│       ├── GsmViewModelFactory.kt        # Inyección de dependencias
-│       └── SolicitudViewModel.kt         # Listados, búsqueda y creación
-├── util/                                 # UTILITARIOS DEL SISTEMA
-│   ├── FileUtil.kt                       # Copia a storage privado, MIME icons y bitmap
-│   ├── GsmNotificationHelper.kt          # Canales de sistema y banners Heads-up
-│   └── QrCodeUtil.kt                     # Generador de bitmaps QR y compartir WhatsApp
-└── MainActivity.kt                       # Punto de entrada de la aplicación Android
+GSM/
+├── keystore/
+│   └── gsm-release.jks                       # Llave de firma Release
+├── functions/
+│   └── index.js                              # Cloud Functions v2 para push FCM
+├── app/release/
+│   └── app-release.apk                       # APK Release firmado
+└── app/src/main/java/com/example/gsm/
+    ├── data/                                 # CAPA DE DATOS Y PERSISTENCIA
+    │   ├── local/                            # SQLite cifrado (Room + SQLCipher v4)
+    │   │   ├── dao/                          # EvidenciaDao, HistorialDao, NotificacionDao, SolicitudDao, UsuarioDao
+    │   │   ├── entity/                       # EvidenciaEntity, HistorialEntity, NotificacionEntity, SolicitudEntity, UsuarioEntity
+    │   │   └── GsmDatabase.kt                # Base cifrada AES-256 + migraciones 1->4 + datos demo
+    │   ├── mapper/                           # HistorialMapper, SolicitudMapper, UsuarioMapper
+    │   ├── model/                            # Solicitud, Usuario, Historial, PlanSoporte, Enums
+    │   ├── remote/                           # Clientes remotos (Firestore, Appwrite y Retrofit Flow)
+    │   │   ├── AppwriteClient.kt             # Inicialización SDK Appwrite Storage
+    │   │   ├── FirebaseClient.kt             # Instancia Firestore
+    │   │   └── flow/                         # FlowApiService.kt, FlowModels.kt, FlowSigner.kt (HMAC-SHA256)
+    │   └── repository/                       # Reglas de negocio y sincronización
+    │       ├── AppwriteStorageRepository.kt  # Subida de evidencias a Appwrite
+    │       ├── EvidenciaRepository.kt        # Validación de tipos y tamaños (15 MB)
+    │       ├── FirebaseSolicitudRepository.kt# Listeners Firestore y conteo remoto
+    │       ├── FlowPaymentRepository.kt      # Órdenes Flow vía Retrofit + fallback sandbox Vercel
+    │       ├── GsmRepository.kt              # Repositorio fachada central + RBAC
+    │       ├── GsmSyncCoordinator.kt         # Sync bidireccional Firestore <-> Room y cola offline
+    │       ├── HistorialRepository.kt        # Auditoría y filtro de notas internas
+    │       ├── NotificacionRepository.kt     # Alertas nativas e internas
+    │       ├── SolicitudLocalRepository.kt   # SLA y operaciones CRUD Room
+    │       └── UsuarioRepository.kt          # Login, perfiles, empresa y respaldo en Firestore
+    ├── security/                             # Cifrado de campos AES-256-GCM y KeyManager
+    ├── service/                              # GsmFirebaseMessagingService.kt (FCM Push)
+    ├── ui/
+    │   ├── view/
+    │   │   ├── components/                   # EncabezadoPantalla, FeedbackMotion, QrNoEncontradoDialog, QrScannerModal, SkeletonLoading, TarjetaSolicitudItem, VisorEvidenciaModal
+    │   │   ├── navigation/                   # AppNavigation.kt (barra inferior, Crossfade y conectividad)
+    │   │   └── screens/
+    │   │       ├── admin/                    # AdminDashboardScreen, GestionUsuariosScreen + componentes/
+    │   │       ├── auth/                     # LoginScreen, FormularioRegistroCliente, CambiarPasswordObligatorioScreen
+    │   │       └── usuario/                  # BandejaScreen, BandejaMensajesScreen, ArchivoTicketsScreen, CrearSolicitudScreen, DetalleSolicitudScreen, ChatTicketScreen, WalletTicketsScreen, PlanesSoporteScreen, PerfilScreen, MiEmpresaScreen + componentes/
+    │   └── viewmodel/                        # AdminDashboardViewModel, AuthViewModel, DetalleSolicitudViewModel, SolicitudViewModel, GsmViewModelFactory
+    ├── util/                                 # FileUtil, Formateadores, GsmNotificationHelper, QrCodeUtil
+    └── MainActivity.kt                       # Punto de entrada y canales FCM
 ```
 
 ---
@@ -354,16 +319,16 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 ## 🚀 8. Funcionalidades Principales y Módulos Nativos
 
 ### 📷 8.1. Escáner QR Nativo con CameraX y ML Kit
-* **Archivo:** [`QrScannerModal.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/components/QrScannerModal.kt)
+* **Archivo:** [`QrScannerModal.kt`](app/src/main/java/com/example/gsm/ui/view/components/QrScannerModal.kt)
 * **Cómo funciona:** Usa la librería oficial de Android Jetpack **CameraX** junto a **Google ML Kit Barcode Scanning**. Analiza los fotogramas en vivo a 30 FPS mediante un hilo de ejecución secundario (`Executors.newSingleThreadExecutor()`).
 * **Permisos dinámicos:** Solicita permisos de cámara en caliente usando `ActivityResultContracts.RequestPermission()`.
-* **Animación de No Encontrado ([`QrNoEncontradoDialog.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/components/QrNoEncontradoDialog.kt)):** Si el código QR escaneado no existe o fue eliminado, despliega un diálogo animado con pulso continuo (`rememberInfiniteTransition`), resaltando el código leído y ofreciendo un botón de *"Reintentar Escaneo"*.
+* **Animación de No Encontrado ([`QrNoEncontradoDialog.kt`](app/src/main/java/com/example/gsm/ui/view/components/QrNoEncontradoDialog.kt)):** Si el código QR escaneado no existe o fue eliminado, despliega un diálogo con sacudida breve (`shakeOnError`), resaltando el código leído y ofreciendo un botón de *"Reintentar Escaneo"*.
 * **Botones para Emulador (1 Clic):** Para evaluar la app en emuladores de PC sin cámara web, incluye botones de prueba directa (`1001`, `1002` y `No Existe ❌`).
 
 ---
 
 ### 🎟️ 8.2. Billetera de Pases Digitales (Apple Wallet Style)
-* **Archivos:** [`WalletTicketsScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/usuario/WalletTicketsScreen.kt) y [`TarjetaWalletTicket.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/usuario/componentes/TarjetaWalletTicket.kt)
+* **Archivos:** [`WalletTicketsScreen.kt`](app/src/main/java/com/example/gsm/ui/view/screens/usuario/WalletTicketsScreen.kt) y [`TarjetaWalletTicket.kt`](app/src/main/java/com/example/gsm/ui/view/screens/usuario/componentes/TarjetaWalletTicket.kt)
 * **Diseño troquelado:** Cada solicitud se dibuja como un pase de evento con muescas semicirculares y línea punteada generada por Canvas (`PathEffect.dashPathEffect`).
 * **Generación Offline de QR:** Genera un mapa de bits nítido de 512x512 píxeles mediante el motor de **ZXing** sin consultar internet.
 * **Compartir QR por WhatsApp:** El botón *"Compartir"* genera la imagen PNG del código QR y la adjunta a WhatsApp o correo mediante un `FileProvider` seguro (`ACTION_SEND`).
@@ -371,7 +336,7 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 ---
 
 ### 📎 8.3. Adjuntar Evidencias Reales y Persistencia Scoped Storage
-* **Archivo:** [`FileUtil.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/util/FileUtil.kt)
+* **Archivo:** [`FileUtil.kt`](app/src/main/java/com/example/gsm/util/FileUtil.kt)
 * **Selector Nativo del Sistema:** Emplea `ActivityResultContracts.GetContent()` con filtro universal `*/*`. Acepta cualquier formato (JPG, PNG, WEBP, PDF, TXT, LOG, CSV, XLSX, DOCX, ZIP).
 * **Solución de Seguridad Android (Scoped Storage):** Al seleccionar un archivo externo, Android otorga permisos de lectura temporales que expiran al cerrar la aplicación. GSM copia de inmediato los bytes del archivo a su carpeta privada permanente:
   ```text
@@ -383,7 +348,7 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 ---
 
 ### 👁️ 8.4. Visor de Archivos e Imágenes In-App
-* **Archivo:** [`VisorEvidenciaModal.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/components/VisorEvidenciaModal.kt)
+* **Archivo:** [`VisorEvidenciaModal.kt`](app/src/main/java/com/example/gsm/ui/view/components/VisorEvidenciaModal.kt)
 * Permite inspeccionar evidencias sin necesidad de abandonar la aplicación:
   - **Imágenes:** Decodifica y renderiza el archivo en pantalla usando `BitmapFactory.decodeFile()` y `asImageBitmap()`.
   - **Logs y Archivos de Texto:** Abre una caja de visualización con tipografía monospace estilo terminal para leer reportes de errores.
@@ -392,7 +357,7 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 ---
 
 ### 💬 8.5. Chat Estilo WhatsApp con Notas Internas Unificadas
-* **Archivo:** [`ChatConversacionTicket.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/usuario/componentes/ChatConversacionTicket.kt)
+* **Archivo:** [`ChatConversacionTicket.kt`](app/src/main/java/com/example/gsm/ui/view/screens/usuario/componentes/ChatConversacionTicket.kt)
 * **Burbujas Conversacionales:** Verde suave a la derecha para mensajes propios con doble check (`✓✓`) y blanco a la izquierda para mensajes recibidos con badge de autor.
 * **Interruptor de Nota Interna:** Ubicado directamente sobre la caja de redacción del mensaje.
   - Si el **Administrador** o el **Técnico** activan el interruptor: la caja se ilumina en color ámbar (`#FFF8E1`), el ícono cambia a candado cerrado y el comentario se guarda como nota interna (`esComentarioInterno = 1`).
@@ -401,15 +366,15 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 ---
 
 ### 🔐 8.6. Recuperación de Contraseñas y Edición de Perfil
-* **Login ([`LoginScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/auth/LoginScreen.kt)):** Diálogo modal de restablecimiento directo donde el usuario ingresa su correo y su nueva clave con validación de coincidencia y guardado inmediato en SQLite.
-* **Perfil ([`PerfilScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/usuario/PerfilScreen.kt)):** Permite editar el nombre completo, teléfono y empresa con actualización reactiva instantánea en la sesión activa y persistencia en Room.
+* **Login ([`LoginScreen.kt`](app/src/main/java/com/example/gsm/ui/view/screens/auth/LoginScreen.kt)):** Diálogo modal de restablecimiento directo donde el usuario ingresa su correo y su nueva clave con validación de coincidencia y guardado inmediato en SQLite.
+* **Perfil ([`PerfilScreen.kt`](app/src/main/java/com/example/gsm/ui/view/screens/usuario/PerfilScreen.kt)):** Permite editar el nombre completo, teléfono y empresa con actualización reactiva instantánea en la sesión activa y persistencia en Room.
 
 ---
 
 ### 👑 8.7. Gestión de Usuarios y Creación de Cuentas por el Administrador
-* **Archivo:** [`GestionUsuariosScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/admin/GestionUsuariosScreen.kt)
+* **Archivo:** [`GestionUsuariosScreen.kt`](app/src/main/java/com/example/gsm/ui/view/screens/admin/GestionUsuariosScreen.kt)
 * **Pantalla Dedicada:** Accesible desde el perfil del Administrador y desde el panel de Métricas.
-* **Tarjetas Resumen:** Muestra contadores rápidos de usuarios registrados por rol (Clientes, Técnicos, Administradores).
+* **Tarjetas Resumen y Filtros:** Muestra contadores interactivos por rol (Clientes, Técnicos, Administradores) con buscador por nombre, correo o empresa y menú de acciones por cuenta.
 * **Alta de Usuarios con Chips:** Formulario modal para crear cuentas con validación de correo único, contraseña y selector de rol RBAC mediante `FilterChip`.
 
 ---
@@ -422,27 +387,27 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 ---
 
 ### 🔔 8.9. Notificaciones Push Nativas y Firebase Cloud Messaging (FCM)
-* **Archivos:** [`GsmFirebaseMessagingService.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/service/GsmFirebaseMessagingService.kt) y [`GsmNotificationHelper.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/util/GsmNotificationHelper.kt)
+* **Archivos:** [`GsmFirebaseMessagingService.kt`](app/src/main/java/com/example/gsm/service/GsmFirebaseMessagingService.kt) y [`GsmNotificationHelper.kt`](app/src/main/java/com/example/gsm/util/GsmNotificationHelper.kt)
 * **Recepción Multi-estado:** Maneja cargas remotas de Firebase Cloud Messaging tanto cuando la app está abierta (foreground), en segundo plano (background) o cerrada/terminada por el sistema.
 * **Canales Nativos de Android (API 26+):** Separa el tráfico en dos canales configurables:
   - `gsm_channel_tickets`: Notificaciones de alta prioridad para cambios de estado, asignaciones de técnico y alertas de resolución.
   - `gsm_channel_chat`: Mensajes directos y notas de soporte en tiempo real.
 * **Permisos Modernos (Android 13+):** Solicita reactivamente el permiso `POST_NOTIFICATIONS` en tiempo de ejecución en `MainActivity.kt`.
-* **Navegación Profunda (Deep Linking):** Al presionar una notificación emergente en la bandeja del sistema operativo, la app extrae el `solicitud_id` y abre directamente la ficha del ticket correspondiente sin pasar por menús intermedios.
+* **Navegación Profunda (Deep Linking):** Al presionar una notificación emergente en la bandeja del sistema operativo, la app resuelve el ticket y abre directamente su ficha sin pasar por menús intermedios.
 * **Disparo Local Automático:** Cada evento registrado en `NotificacionRepository.kt` activa una alerta nativa Heads-up con sonido y vibración.
 
 ---
 
 ### 💳 8.10. Pasarela de Pagos Flow Chile y Planes SLA
-* **Archivos:** [`FlowPaymentRepository.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/data/repository/FlowPaymentRepository.kt) y [`PlanesSoporteScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/usuario/PlanesSoporteScreen.kt)
-* **Integración Oficial Flow:** Permite contratar o renovar paquetes de soporte técnico (Plan Básico, Plan Pro y Plan Enterprise) calculando monto, orden de compra y firma digital.
+* **Archivos:** [`FlowPaymentRepository.kt`](app/src/main/java/com/example/gsm/data/repository/FlowPaymentRepository.kt) y [`PlanesSoporteScreen.kt`](app/src/main/java/com/example/gsm/ui/view/screens/usuario/PlanesSoporteScreen.kt)
+* **Integración Oficial Flow:** Permite contratar o renovar paquetes de soporte técnico (`PLUS`, `PRO`, `MAX`) calculando monto, orden de compra y firma digital HMAC-SHA256.
 * **Apertura Segura con Android Custom Tabs:** Lanza la pasarela en una pestaña nativa segura (`androidx.browser.customtabs`) sin sacar al usuario de la aplicación.
 * **Simulador de Sandbox en Vercel:** Conectado directamente a la plataforma web oficial en Vercel para pruebas completas de pasarela (`https://gsm-web-delta.vercel.app/planes/simulador`) con webhooks de confirmación (`/api/flow/confirm` y `/api/flow/confirmacion`).
 
 ---
 
 ### 👤 8.11. Registro de Nuevos Clientes y Onboarding de Suscripción
-* **Archivos:** [`LoginScreen.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/ui/view/screens/auth/LoginScreen.kt) y [`UsuarioRepository.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/data/repository/UsuarioRepository.kt)
+* **Archivos:** [`LoginScreen.kt`](app/src/main/java/com/example/gsm/ui/view/screens/auth/LoginScreen.kt), [`FormularioRegistroCliente.kt`](app/src/main/java/com/example/gsm/ui/view/screens/auth/FormularioRegistroCliente.kt) y [`UsuarioRepository.kt`](app/src/main/java/com/example/gsm/data/repository/UsuarioRepository.kt)
 * **Autoregistro de Clientes:** Formulario moderno para clientes pyme solicitando nombre completo, correo corporativo, razón social, teléfono y clave con confirmación.
 * **Flujo de Suscripción Diferenciado (KISS):**
   - **Cuentas Mock de Prueba:** Mantienen su plan `PRO` activo y tickets precargados para demostraciones académicas inmediatas.
@@ -452,7 +417,7 @@ El sistema calcula la fecha límite automáticamente según la prioridad fijada 
 ---
 
 ### 🛡️ 8.12. Cifrado Nativo de Base de Datos con SQLCipher
-* **Archivo:** [`GsmDatabase.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/data/local/GsmDatabase.kt) y [`MainActivity.kt`](file:///C:/Users/juanm/OneDrive/Desktop/kotlin/proyectoSemestral/GSM/app/src/main/java/com/example/gsm/MainActivity.kt)
+* **Archivo:** [`GsmDatabase.kt`](app/src/main/java/com/example/gsm/data/local/GsmDatabase.kt) y [`MainActivity.kt`](app/src/main/java/com/example/gsm/MainActivity.kt)
 * **Cifrado Militar AES-256 en Reposo:** La base de datos SQLite de Room se encuentra completamente cifrada en el disco del dispositivo mediante la librería nativa `SQLCipher` (`System.loadLibrary("sqlcipher")`).
 * **Protección ante Extracción de Datos:** Si alguien intenta volcar el archivo `.db` desde un teléfono rooteado o emulador, la base de datos es ilegible sin la clave de cifrado generada por la app.
 
@@ -531,19 +496,30 @@ Al instalar la app por primera vez, `GsmDatabase` inicializa automáticamente da
 ### Requisitos Previos
 * **Android Studio:** Ladybug (2024.2) o superior.
 * **Java Development Kit (JDK):** JDK 17 o JDK 21 (incluido en Android Studio en `jbr/`).
-* **Dispositivo / Emulador:** Android 13.0 (API 33) hasta Android 15.0 (API 35).
+* **Dispositivo / Emulador:** Android 8.0 (API 26) hasta Android 16/17 (API 37).
 
 ### Pasos de Instalación
 1. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/usuario/GSM.git
+   git clone https://github.com/Liz-Elizabeth/GSM.git
+   cd GSM
    ```
-2. **Abrir en Android Studio:** Selecciona la carpeta `GSM` y espera que Gradle sincronice las dependencias.
-3. **Compilar desde Terminal (Opcional):**
-   ```bash
-   ./gradlew assembleDebug
+2. **Configurar variables locales y Firebase:**
+   - Copia `local.properties.example` como `local.properties` y completa `sdk.dir`, credenciales de Appwrite, Flow Sandbox y tu alias/clave del `.jks` (`KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
+   - Verifica que `app/google-services.json` esté presente para Firebase Firestore y FCM.
+3. **Abrir en Android Studio:** Selecciona la carpeta `GSM` y presiona **Sync Project with Gradle Files**.
+4. **Ejecutar pruebas y compilar:**
+   ```powershell
+   # Pruebas unitarias (ViewModel + Repositorios)
+   .\gradlew.bat testDebugUnitTest --no-daemon
+
+   # Pruebas de interfaz Compose en dispositivo/emulador conectado
+   .\gradlew.bat connectedDebugAndroidTest --no-daemon
+
+   # Generar APK firmado con keystore/gsm-release.jks
+   .\gradlew.bat assembleRelease --no-daemon
    ```
-4. **Ejecutar:** Presiona el botón verde **▶️ Run** en Android Studio seleccionando tu emulador o teléfono físico.
+5. **Ejecutar en dispositivo:** Presiona **▶️ Run** en Android Studio o instala `app/release/app-release.apk`.
 
 ---
 
@@ -655,7 +631,56 @@ Junto con el texto, adjunta automáticamente la imagen PNG del código QR genera
 
 ---
 
-## ✅ 16. Checklist Maestro de Criterios del Caso
+## 🌐 16. Endpoints, API Externa (Retrofit) y Servicios en la Nube
+
+### API Externa (Retrofit - Pasarela Flow Chile)
+Implementada en [`FlowApiService.kt`](app/src/main/java/com/example/gsm/data/remote/flow/FlowApiService.kt) y consumida desde [`FlowPaymentRepository.kt`](app/src/main/java/com/example/gsm/data/repository/FlowPaymentRepository.kt) con firma HMAC-SHA256 ([`FlowSigner.kt`](app/src/main/java/com/example/gsm/data/remote/flow/FlowSigner.kt)):
+
+| Método | Endpoint | Base URL | Propósito |
+| :--- | :--- | :--- | :--- |
+| `POST` | `payment/create` | `https://sandbox.flow.cl/api/` | Crea la orden de pago del plan SLA (`PLUS`, `PRO`, `MAX`) y retorna URL + `token`. |
+| `GET` | `payment/getStatus` | `https://sandbox.flow.cl/api/` | Consulta el estado del pago por `apiKey`, `token` y firma `s`. |
+| `GET / POST` | `/planes/simulador`, `/api/flow/confirm`, `/api/flow/confirmacion` | `https://gsm-web-delta.vercel.app` | Webhooks de confirmación y simulador sandbox web para pruebas sin tarjeta real. |
+
+### Persistencia Remota, Storage y Push (Firebase + Appwrite)
+| Servicio | Recurso / Colección | Archivo Principal | Uso |
+| :--- | :--- | :--- | :--- |
+| **Cloud Firestore** | `solicitudes/{codigoSeguimiento}` | `FirebaseSolicitudRepository.kt` | Sincronización bidireccional en tiempo real de tickets, prioridades y estados. |
+| **Cloud Firestore** | `solicitudes/{codigo}/historial/{id}` | `FirebaseSolicitudRepository.kt` | Chat en vivo e historial de auditoría (contenido cifrado con AES-256-GCM `ENC:v1:`). |
+| **Cloud Firestore** | `usuarios/{correo}` | `UsuarioRepository.kt` | Respaldo multi-dispositivo de perfiles y equipos de empresa. |
+| **Appwrite Storage** | Bucket de evidencias | `AppwriteStorageRepository.kt` | Almacenamiento en nube de fotografías y documentos adjuntos. |
+| **Cloud Functions v2 + FCM** | `notificarAsignacionTicket`, `notificarNuevoMensajeChat` | `functions/index.js` | Envío de notificaciones push nativas al asignar técnico o recibir mensajes. |
+
+---
+
+## 🧪 17. Pruebas Unitarias y de Interfaz (Testing)
+
+| Tipo | Suite | Archivo | Qué valida |
+| :--- | :--- | :--- | :--- |
+| **Unitaria (ViewModel)** | `AuthViewModelTest` (6 tests) | [`AuthViewModelTest.kt`](app/src/test/java/com/example/gsm/viewmodel/AuthViewModelTest.kt) | Login válido/inválido, validación de registro, cambio obligatorio de clave y cierre de sesión con `FakeUsuarioDao`. |
+| **Unitaria (Repository)** | `UsuarioRepositoryTest` | [`UsuarioRepositoryTest.kt`](app/src/test/java/com/example/gsm/repository/UsuarioRepositoryTest.kt) | Autenticación, reglas RBAC, activación/suspensión y alta de cuentas con `FakeUsuarioDao`. |
+| **Unitaria (Repository)** | `SolicitudRepositoryTest` | [`SolicitudRepositoryTest.kt`](app/src/test/java/com/example/gsm/repository/SolicitudRepositoryTest.kt) | Cálculo de SLA, cambios de estado y validaciones CRUD con `FakeSolicitudDao`. |
+| **Unitaria (Repository)** | `FlowPaymentRepositoryTest` | [`FlowPaymentRepositoryTest.kt`](app/src/test/java/com/example/gsm/repository/FlowPaymentRepositoryTest.kt) | Generación de firma HMAC-SHA256 y órdenes de pago usando `FakeFlowApiService`. |
+| **Instrumentada UI (Compose)** | `LoginFormUiTest`, `CambiarPasswordFormUiTest` | [`LoginFormUiTest.kt`](app/src/androidTest/java/com/example/gsm/ui/LoginFormUiTest.kt) | Llenado de formularios, cambio de pestaña y habilitación de botones en Compose (`Espresso 3.7.0`). |
+
+---
+
+## 📦 18. APK Firmado, Llave `.jks` y Planificación (Trello)
+
+* **Llave de firma `.jks`:** [`keystore/gsm-release.jks`](keystore/gsm-release.jks)
+* **Configuración Gradle:** bloque `signingConfigs` y `buildTypes.release` (`optimization.enable = false`) en [`app/build.gradle.kts`](app/build.gradle.kts) leyendo propiedades desde `local.properties`.
+* **APK Firmado generado:** [`app/release/app-release.apk`](app/release/app-release.apk)
+* **Tablero Trello (Planificación distribuida):** `<!-- TODO: Pegar aquí el enlace público al tablero Trello del equipo -->`
+
+### Capturas de APK Firmado, Llave `.jks` y Trello
+> *Espacio reservado para adjuntar las capturas finales generadas tras ejecutar `.\gradlew.bat assembleRelease --no-daemon`:*
+> - `docs/evidencias/apk_firmado.png` *(pendiente de capturar y subir)*
+> - `docs/evidencias/keystore_jks.png` *(pendiente de capturar y subir)*
+> - `docs/evidencias/trello_tablero.png` *(pendiente de capturar y subir)*
+
+---
+
+## ✅ 19. Checklist Maestro de Criterios del Caso
 
 | Criterio Evaluado | Detalle del Requerimiento | Estado |
 | :--- | :--- | :---: |
@@ -683,7 +708,7 @@ Junto con el texto, adjunta automáticamente la imagen PNG del código QR genera
 
 ---
 
-## ❓ 17. Preguntas Frecuentes (FAQ)
+## ❓ 20. Preguntas Frecuentes (FAQ)
 
 <details>
 <summary><b>1. ¿Por qué las evidencias no se borran al cerrar la app?</b></summary>
@@ -712,12 +737,12 @@ Porque están diseñadas para comentarios técnicos y diagnósticos privados del
 <details>
 <summary><b>5. ¿Por qué se utilizó 'material-icons-extended'?</b></summary>
 
-Para garantizar una estética nativa y sobria alineada con las guías de diseño de Android (Material 3). Aunque en modo Debug incluye el catálogo completo, durante la compilación en Release la herramienta R8/ProGuard realiza *tree-shaking*, eliminando todos los íconos no utilizados y dejando el APK con un peso óptimo.
+Para garantizar una estética nativa y sobria alineada con las guías de diseño de Android (Material 3). En `app/build.gradle.kts`, la variante `release` firma el APK con `keystore/gsm-release.jks` y mantiene `optimization { enable = false }` para asegurar compatibilidad completa en tiempo de ejecución con las librerías nativas de SQLCipher, Firestore y Gson.
 </details>
 
 ---
 
-## 👩‍💻👨‍💻 18. Autores
+## 👩‍💻👨‍💻 21. Autores
 
 <div align="center">
 

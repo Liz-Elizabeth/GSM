@@ -15,12 +15,21 @@ val localProperties = Properties().apply {
     }
 }
 
-val flowApiKey = localProperties.getProperty("FLOW_API_KEY") ?: ""
-val flowSecretKey = localProperties.getProperty("FLOW_SECRET_KEY") ?: ""
-val flowEnv = localProperties.getProperty("FLOW_ENVIRONMENT") ?: "sandbox"
-val appwriteEndpoint = localProperties.getProperty("APPWRITE_ENDPOINT") ?: "https://nyc.cloud.appwrite.io/v1"
-val appwriteProjectId = localProperties.getProperty("APPWRITE_PROJECT_ID") ?: "6ae91595000d83e34686"
-val appwriteBucketId = localProperties.getProperty("APPWRITE_BUCKET_ID") ?: "6ae915ad002bdc1515ec"
+fun localProp(name: String, default: String = ""): String =
+    (localProperties.getProperty(name) ?: System.getenv(name) ?: default)
+        .trim()
+        .removeSurrounding("\"")
+
+val flowApiKey = localProp("FLOW_API_KEY")
+val flowSecretKey = localProp("FLOW_SECRET_KEY")
+val flowEnv = localProp("FLOW_ENVIRONMENT", "sandbox")
+val appwriteEndpoint = localProp("APPWRITE_ENDPOINT")
+val appwriteProjectId = localProp("APPWRITE_PROJECT_ID")
+val appwriteBucketId = localProp("APPWRITE_BUCKET_ID")
+val keystoreFilePath = localProp("KEYSTORE_FILE", "keystore/gsm-release.jks")
+val ksStorePassword = localProp("KEYSTORE_PASSWORD")
+val ksAlias = localProp("KEY_ALIAS")
+val ksKeyPassword = localProp("KEY_PASSWORD", ksStorePassword)
 
 android {
     namespace = "com.example.gsm"
@@ -30,7 +39,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.gsm"
-        minSdk = 33
+        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -45,11 +54,23 @@ android {
         buildConfigField("String", "APPWRITE_BUCKET_ID", "\"$appwriteBucketId\"")
     }
 
+    signingConfigs {
+        val ksFile = rootProject.file(keystoreFilePath)
+        if (ksFile.exists() && ksStorePassword.isNotBlank() && ksAlias.isNotBlank()) {
+            create("release") {
+                storeFile = ksFile
+                storePassword = ksStorePassword
+                keyAlias = ksAlias
+                keyPassword = ksKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             optimization {
-                enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                enable = false
             }
         }
     }
@@ -74,6 +95,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinxCoroutinesTest)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

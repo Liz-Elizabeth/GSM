@@ -84,11 +84,17 @@ class CambiarPasswordFormUiTest {
         }
 
         // Verifica el título informativo de la pantalla
-        composeTestRule.onNodeWithText("Actualización de Seguridad Requerida").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Actualización de Seguridad Requerida")
+            .performScrollTo()
+            .assertIsDisplayed()
 
         // Verifica que los dos campos de contraseña estén presentes
-        composeTestRule.onNodeWithText("Nueva contraseña").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Confirmar nueva contraseña").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Nueva contraseña")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithText("Confirmar nueva contraseña")
+            .performScrollTo()
+            .assertIsDisplayed()
 
         // Verifica que el botón de actualización esté visible
         composeTestRule.onNodeWithText("Guardar y Continuar")
@@ -110,10 +116,12 @@ class CambiarPasswordFormUiTest {
 
         // Escribe la nueva clave apuntando al label visible (el placeholder en Material 3 solo se monta al hacer foco)
         composeTestRule.onNodeWithText("Nueva contraseña")
+            .performScrollTo()
             .performTextInput("NuevaClave2026")
 
         // Escribe la confirmación en el segundo campo apuntando a su label
         composeTestRule.onNodeWithText("Confirmar nueva contraseña")
+            .performScrollTo()
             .performTextInput("NuevaClave2026")
 
         // Valida que el botón de confirmación se habilite y sea visible incluso con teclado abierto

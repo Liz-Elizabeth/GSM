@@ -72,14 +72,18 @@ class LoginFormUiTest {
         }
 
         // Verifica que la pantalla cargue el encabezado de bienvenida
-        composeTestRule.onNodeWithText("Bienvenido de nuevo").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Bienvenido de nuevo")
+            .performScrollTo()
+            .assertIsDisplayed()
 
         // Escribe correo electrónico en el campo correspondiente
         composeTestRule.onNodeWithText("contacto@miempresa.cl")
+            .performScrollTo()
             .performTextInput("soporte@cliente.cl")
 
         // Escribe contraseña en el campo correspondiente
         composeTestRule.onNodeWithText("Ingresa tu contraseña")
+            .performScrollTo()
             .performTextInput("ClaveSegura123")
 
         // Verifica que el botón de Iniciar Sesión esté presente y visible (scroll por si el teclado lo tapa)
@@ -98,10 +102,16 @@ class LoginFormUiTest {
         }
 
         // Hace clic en la pestaña "Crear Cuenta"
-        composeTestRule.onNodeWithText("Crear Cuenta").performClick()
+        composeTestRule.onNodeWithText("Crear Cuenta")
+            .performScrollTo()
+            .performClick()
 
         // Verifica que el formulario cambie a "Registro de Cliente"
-        composeTestRule.onNodeWithText("Registro de Cliente").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Nombre Completo *").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Registro de Cliente")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithText("Nombre Completo *")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 }

@@ -20,12 +20,12 @@ build/
 */build/
 /build
 app/build/
-app/release/
+app/release/*
+!app/release/app-release.apk
 app/debug/
-**/release/
-**/debug/
 output-metadata.json
 *.apk
+!app/release/app-release.apk
 *.apks
 *.aab
 
@@ -38,11 +38,12 @@ google-services.json
 GoogleService-Info.plist
 */GoogleService-Info.plist
 
-# Keystores y Certificados de Firma
+# Keystores y Certificados de Firma (habilita solo keystore/gsm-release.jks para rúbrica IE 3.3.1)
 keyProduccion/
 **/keyProduccion/
 **/keyProd
 *.jks
+!keystore/gsm-release.jks
 *.keystore
 *.key
 *.p8
