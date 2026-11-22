@@ -1,5 +1,9 @@
 package com.example.gsm.ui.view.screens.admin.componentes
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,8 +12,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,38 +30,78 @@ import com.example.gsm.ui.view.screens.usuario.componentes.TeamworkBlue
 private fun FilaMetrica(
     etiqueta: String,
     valor: Int,
+    maxValor: Int,
+    colorPunto: Color,
     colorBadge: Color = AppleBackground,
-    colorTextoBadge: Color = Color.Black
+    colorTextoBadge: Color = Color(0xFF1C1C1E),
+    onClick: (() -> Unit)? = null
 ) {
-    Row(
+    val proporcion by animateFloatAsState(
+        targetValue = if (maxValor > 0) (valor.toFloat() / maxValor.toFloat()).coerceIn(0f, 1f) else 0f,
+        animationSpec = tween(320),
+        label = "barra$etiqueta"
+    )
+    Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(
-            text = etiqueta,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
-        Surface(
-            color = colorBadge,
-            shape = CircleShape
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = valor.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = colorTextoBadge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(colorPunto, CircleShape)
+                )
+                Text(
+                    text = etiqueta,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Surface(
+                color = colorBadge,
+                shape = CircleShape
+            ) {
+                Text(
+                    text = valor.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colorTextoBadge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(AppleBackground)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(proporcion)
+                    .fillMaxHeight()
+                    .clip(CircleShape)
+                    .background(colorPunto.copy(alpha = 0.75f))
             )
         }
     }
 }
 
 /**
- * Tabla de métricas por estado estilo Inset Grouped de iOS Settings.
+ * Tabla de métricas por estado con barras proporcionales animadas.
  */
 @Composable
 fun DistribucionEstadosCard(
@@ -68,6 +114,7 @@ fun DistribucionEstadosCard(
     cerradas: Int,
     canceladas: Int
 ) {
+    val maxEstado = maxOf(1, recibidas, enRevision, asignadas, enProceso, pendientesInfo, resueltas, cerradas, canceladas)
     Column(modifier = Modifier.fillMaxWidth()) {
         SeccionTitulo("Distribución por Estado")
         Surface(
@@ -76,41 +123,49 @@ fun DistribucionEstadosCard(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                FilaMetrica("📥 Recibidas", recibidas)
+                FilaMetrica("Recibidas", recibidas, maxEstado, Color(0xFF64748B))
                 HorizontalDivider(color = AppleBackground)
-                FilaMetrica("🔍 En Revisión", enRevision)
+                FilaMetrica("En Revisión", enRevision, maxEstado, Color(0xFF0EA5E9))
                 HorizontalDivider(color = AppleBackground)
-                FilaMetrica("👤 Asignadas", asignadas)
+                FilaMetrica("Asignadas", asignadas, maxEstado, Color(0xFF6366F1))
                 HorizontalDivider(color = AppleBackground)
                 FilaMetrica(
-                    etiqueta = "🔧 En Proceso",
+                    etiqueta = "En Proceso",
                     valor = enProceso,
+                    maxValor = maxEstado,
+                    colorPunto = TeamworkBlue,
                     colorBadge = TeamworkBlue.copy(alpha = 0.12f),
                     colorTextoBadge = TeamworkBlue
                 )
                 HorizontalDivider(color = AppleBackground)
-                FilaMetrica("❓ Pendientes de Info", pendientesInfo)
+                FilaMetrica("Pendientes de Info", pendientesInfo, maxEstado, Color(0xFFF59E0B))
                 HorizontalDivider(color = AppleBackground)
                 FilaMetrica(
-                    etiqueta = "✅ Resueltas",
+                    etiqueta = "Resueltas",
                     valor = resueltas,
+                    maxValor = maxEstado,
+                    colorPunto = SuccessGreenText,
                     colorBadge = SuccessGreenBg,
                     colorTextoBadge = SuccessGreenText
                 )
                 HorizontalDivider(color = AppleBackground)
-                FilaMetrica("🔒 Cerradas", cerradas)
+                FilaMetrica("Cerradas", cerradas, maxEstado, Color(0xFF10B981))
                 HorizontalDivider(color = AppleBackground)
-                FilaMetrica("🚫 Canceladas", canceladas)
+                FilaMetrica("Canceladas", canceladas, maxEstado, Color(0xFFD92D20))
             }
         }
     }
 }
 
 /**
- * Tabla de carga de trabajo distribuida por técnico responsable (Workload).
+ * Tabla de carga de trabajo distribuida por técnico responsable (accionable por técnico).
  */
 @Composable
-fun CargaTecnicosCard(porTecnico: List<ConteoPorTecnicoDto>) {
+fun CargaTecnicosCard(
+    porTecnico: List<ConteoPorTecnicoDto>,
+    onSeleccionarTecnico: (Int) -> Unit = {}
+) {
+    val maxCarga = maxOf(1, porTecnico.maxOfOrNull { it.totalSolicitudes } ?: 1)
     Column(modifier = Modifier.fillMaxWidth()) {
         SeccionTitulo("Carga por Responsable Técnico")
         Surface(
@@ -129,10 +184,13 @@ fun CargaTecnicosCard(porTecnico: List<ConteoPorTecnicoDto>) {
                 } else {
                     porTecnico.forEachIndexed { index, dto ->
                         FilaMetrica(
-                            etiqueta = "👨‍💻 ${dto.nombreTecnico ?: "Sin asignar"}",
+                            etiqueta = dto.nombreTecnico ?: "Sin asignar",
                             valor = dto.totalSolicitudes,
+                            maxValor = maxCarga,
+                            colorPunto = TeamworkBlue,
                             colorBadge = TeamworkBlue.copy(alpha = 0.12f),
-                            colorTextoBadge = TeamworkBlue
+                            colorTextoBadge = TeamworkBlue,
+                            onClick = dto.tecnicoId?.let { id -> { onSeleccionarTecnico(id) } }
                         )
                         if (index < porTecnico.lastIndex) {
                             HorizontalDivider(color = AppleBackground)

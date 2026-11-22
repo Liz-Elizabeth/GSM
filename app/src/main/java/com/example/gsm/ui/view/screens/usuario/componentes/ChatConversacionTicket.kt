@@ -241,16 +241,23 @@ fun BurbujaChatWhatsApp(
                     )
                 }
 
-                // Miniatura de evidencia si incluye foto adjunta
+                // Miniatura de evidencia si incluye foto adjunta (decodificada en Dispatchers.IO + LruCache)
                 if (!evento.evidenciaAdjunta.isNullOrBlank()) {
                     val ruta = evento.evidenciaAdjunta
-                    val bitmap = remember(ruta) {
-                        try {
-                            FileUtil.cargarBitmapDesdeUri(context, ruta)
-                        } catch (e: Exception) {
-                            null
-                        }
+                    val probableImagen = remember(ruta) {
+                        ruta.startsWith("http", ignoreCase = true) ||
+                            ruta.endsWith(".jpg", ignoreCase = true) ||
+                            ruta.endsWith(".jpeg", ignoreCase = true) ||
+                            ruta.endsWith(".png", ignoreCase = true) ||
+                            ruta.endsWith(".webp", ignoreCase = true)
                     }
+                    val estadoImagen by produceState<Pair<android.graphics.Bitmap?, Boolean>>(
+                        initialValue = null to probableImagen,
+                        ruta
+                    ) {
+                        value = FileUtil.cargarBitmapAsync(context, ruta) to false
+                    }
+                    val (bitmap, cargandoImagen) = estadoImagen
 
                     if (bitmap != null) {
                         Box(
@@ -275,6 +282,22 @@ fun BurbujaChatWhatsApp(
                                 contentDescription = "Foto adjunta",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    } else if (cargandoImagen) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFE5E5EA))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Image,
+                                contentDescription = null,
+                                tint = Color(0xFF8E8E93),
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     } else {
@@ -355,104 +378,6 @@ fun BurbujaChatWhatsApp(
                             fontWeight = FontWeight.Bold,
                             color = ChatBlueCheck
                         )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Sección de conversación para incrustar dentro de la pestaña de detalle del ticket.
- */
-@Composable
-fun ChatConversacionTicket(
-    historial: List<Historial>,
-    usuarioActualId: Int,
-    usuarioActualRol: RolUsuario,
-    estaCerrado: Boolean,
-    textoMensaje: String,
-    onTextoChange: (String) -> Unit,
-    esNotaInterna: Boolean = false,
-    onNotaInternaChange: ((Boolean) -> Unit)? = null,
-    alEnviar: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFFF8FAFC),
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (historial.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 20.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "💬 Sin mensajes aún. Escribe abajo para iniciar conversación.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF64748B)
-                        )
-                    }
-                } else {
-                    historial.forEach { evento ->
-                        BurbujaChatWhatsApp(
-                            evento = evento,
-                            usuarioActualId = usuarioActualId,
-                            usuarioActualRol = usuarioActualRol
-                        )
-                    }
-                }
-
-                if (!estaCerrado) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = textoMensaje,
-                            onValueChange = onTextoChange,
-                            placeholder = { Text("Escribe un mensaje...", fontSize = 13.sp) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(20.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedBorderColor = TeamworkBlue,
-                                unfocusedBorderColor = Color(0xFFE2E8F0)
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                        )
-
-                        val puedeEnviar = textoMensaje.isNotBlank()
-                        Surface(
-                            onClick = { if (puedeEnviar) alEnviar() },
-                            enabled = puedeEnviar,
-                            shape = CircleShape,
-                            color = if (puedeEnviar) TeamworkBlue else Color(0xFFD1D1D6),
-                            modifier = Modifier.size(42.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Enviar",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
                     }
                 }
             }

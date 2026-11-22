@@ -1,11 +1,5 @@
 package com.example.gsm.ui.view.components
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -15,10 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -37,18 +29,6 @@ fun QrNoEncontradoDialog(
     onReintentar: () -> Unit,
     onCerrar: () -> Unit
 ) {
-    // Animación de pulso continuo sobre el icono de no encontrado
-    val infiniteTransition = rememberInfiniteTransition(label = "pulseTransition")
-    val escalaIcono by infiniteTransition.animateFloat(
-        initialValue = 0.88f,
-        targetValue = 1.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 650, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "escalaIcono"
-    )
-
     AlertDialog(
         onDismissRequest = onCerrar,
         shape = RoundedCornerShape(22.dp),
@@ -62,10 +42,11 @@ fun QrNoEncontradoDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // 1. Icono animado de alerta
+                // 1. Icono de alerta con sacudida única al aparecer
                 Box(
                     modifier = Modifier
                         .size(80.dp)
+                        .shakeOnError(1)
                         .background(Color(0xFFFFEBEE), CircleShape)
                         .border(2.dp, Color(0xFFEF5350).copy(alpha = 0.4f), CircleShape),
                     contentAlignment = Alignment.Center
@@ -74,9 +55,7 @@ fun QrNoEncontradoDialog(
                         imageVector = Icons.Filled.SearchOff,
                         contentDescription = "No Encontrado",
                         tint = Color(0xFFEF5350),
-                        modifier = Modifier
-                            .size(40.dp)
-                            .scale(escalaIcono)
+                        modifier = Modifier.size(40.dp)
                     )
                 }
 

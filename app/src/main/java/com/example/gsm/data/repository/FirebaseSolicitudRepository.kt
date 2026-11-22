@@ -9,9 +9,13 @@ import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Solicitud
 import com.example.gsm.data.remote.FirebaseClient
 import com.example.gsm.security.GsmCryptoManager
+import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -52,6 +56,7 @@ class FirebaseSolicitudRepository(
                 "motivoCancelacion" to solicitud.motivoCancelacion?.let { GsmCryptoManager.encrypt(it) },
                 "motivoReapertura" to solicitud.motivoReapertura?.let { GsmCryptoManager.encrypt(it) },
                 "conformidadCliente" to solicitud.conformidadCliente,
+                "calificacionCliente" to solicitud.calificacionCliente,
                 "fechaLimite" to solicitud.fechaLimite,
                 "fechaCreacion" to solicitud.fechaCreacion,
                 "fechaActualizacion" to System.currentTimeMillis()
@@ -66,20 +71,25 @@ class FirebaseSolicitudRepository(
     }
 
     /**
-     * Escucha en tiempo real todas las solicitudes.
-     * Mantiene el flujo vivo ante avisos de red o reconexiones.
+     * Escucha en tiempo real las solicitudes más recientes (acotado a 100 para controlar lecturas y RAM).
      */
     fun escucharSolicitudes(): Flow<List<Solicitud>> = callbackFlow {
-        val listener = solicitudesRef.addSnapshotListener { snapshot, error ->
+        val listener = solicitudesRef
+            .orderBy("fechaActualizacion", Query.Direction.DESCENDING)
+            .limit(100)
+            .addSnapshotListener { snapshot, error ->
             if (error != null) {
                 Log.w("FirebaseSync", "Aviso en listener de solicitudes: ${error.message}")
                 return@addSnapshotListener
             }
-            val solicitudes = snapshot?.documents?.mapNotNull { doc ->
-                mapearDocumentoASolicitud(doc)
-            } ?: emptyList()
-            Log.d("FirebaseSync", "Descargadas ${solicitudes.size} solicitudes desde Firestore")
-            trySend(solicitudes)
+            val solicitudes = snapshot?.documentChanges
+                ?.filter { it.type != DocumentChange.Type.REMOVED }
+                ?.mapNotNull { change -> mapearDocumentoASolicitud(change.document) }
+                ?: emptyList()
+            if (solicitudes.isNotEmpty()) {
+                Log.d("FirebaseSync", "Sincronizadas ${solicitudes.size} solicitudes modificadas desde Firestore")
+                trySend(solicitudes)
+            }
         }
         awaitClose { listener.remove() }
     }
@@ -125,8 +135,14 @@ class FirebaseSolicitudRepository(
 
             val doc = historialRef.add(datos).await()
 
-            // Actualizar timestamp en la cabecera del ticket
-            solicitudesRef.document(codigo).update("fechaActualizacion", fecha).await()
+            // Actualiza timestamp y registra el token FCM del remitente para notificaciones push en functions/index.js
+            val actualizacionCabecera = mutableMapOf<String, Any>("fechaActualizacion" to fecha)
+            val tokenFcm = runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull()
+            if (!tokenFcm.isNullOrBlank()) {
+                val campoToken = if (autorRol == RolUsuario.CLIENTE) "clienteFcmToken" else "tecnicoFcmToken"
+                actualizacionCabecera[campoToken] = tokenFcm
+            }
+            solicitudesRef.document(codigo).update(actualizacionCabecera).await()
 
             Log.d("FirebaseSync", "Mensaje enviado a Firestore ($codigo): ${doc.id}")
             Result.success(doc.id)
@@ -148,7 +164,10 @@ class FirebaseSolicitudRepository(
         }
 
         val historialRef = solicitudesRef.document(codigo).collection("historial")
-        val listener = historialRef.addSnapshotListener { snapshot, error ->
+        val listener = historialRef
+            .orderBy("fechaCambio", Query.Direction.ASCENDING)
+            .limitToLast(200)
+            .addSnapshotListener { snapshot, error ->
             if (error != null) {
                 Log.w("FirebaseSync", "Aviso en escucha de chat ($codigo): ${error.message}")
                 return@addSnapshotListener
@@ -227,6 +246,26 @@ class FirebaseSolicitudRepository(
     }
 
     /**
+     * Cuenta el total real de tickets en Firestore mediante agregación del servidor
+     * (evita quedar truncado al límite de 100 documentos del listener en vivo).
+     */
+    suspend fun contarSolicitudesRemotas(): Long? = runCatching {
+        solicitudesRef.count().get(AggregateSource.SERVER).await().count
+    }.getOrNull()
+
+    /**
+     * Descarga puntual de historial amplio (hasta [limite]) para la vista Archivo.
+     */
+    suspend fun sincronizarArchivoRemoto(limite: Long = 500): List<Solicitud> = runCatching {
+        val snap = solicitudesRef
+            .orderBy("fechaActualizacion", Query.Direction.DESCENDING)
+            .limit(limite)
+            .get()
+            .await()
+        snap.documents.mapNotNull { mapearDocumentoASolicitud(it) }
+    }.getOrDefault(emptyList())
+
+    /**
      * Mapea de forma segura los datos de Firebase al modelo Solicitud de la app.
      */
     private fun mapearDocumentoASolicitud(doc: DocumentSnapshot): Solicitud? {
@@ -277,6 +316,7 @@ class FirebaseSolicitudRepository(
                 motivoCancelacion = (data["motivoCancelacion"] as? String)?.let { GsmCryptoManager.decrypt(it) },
                 motivoReapertura = (data["motivoReapertura"] as? String)?.let { GsmCryptoManager.decrypt(it) },
                 conformidadCliente = data["conformidadCliente"] as? Boolean,
+                calificacionCliente = (data["calificacionCliente"] as? Number)?.toInt(),
                 fechaLimite = extraerEpochOpcional(data["fechaLimite"]),
                 fechaCreacion = extraerEpoch(data["fechaCreacion"]),
                 fechaActualizacion = extraerEpoch(data["fechaActualizacion"]),

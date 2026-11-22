@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
         EvidenciaEntity::class,
         NotificacionEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class GsmDatabase : RoomDatabase() {
@@ -67,6 +67,13 @@ abstract class GsmDatabase : RoomDatabase() {
             }
         }
 
+        // Conserva caché local al agregar calificacionCliente (v3 -> v4) sin destrucción de datos
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE solicitudes ADD COLUMN calificacionCliente INTEGER")
+            }
+        }
+
         fun getInstance(context: Context): GsmDatabase {
             try {
                 System.loadLibrary("sqlcipher")
@@ -99,8 +106,7 @@ abstract class GsmDatabase : RoomDatabase() {
                     "gsm_database.db"
                 )
                     .openHelperFactory(supportFactory)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
 

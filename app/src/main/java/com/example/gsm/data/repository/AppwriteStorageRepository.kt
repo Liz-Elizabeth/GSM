@@ -1,6 +1,7 @@
 package com.example.gsm.data.repository
 
 import android.net.Uri
+import android.util.Log
 import com.example.gsm.data.remote.AppwriteClient
 import io.appwrite.ID
 import io.appwrite.models.InputFile
@@ -33,6 +34,8 @@ class AppwriteStorageRepository {
 
             require(file.exists()) { "El archivo local de evidencia no existe en: $uriLocal" }
 
+            Log.d("AppwriteStorage", "Subiendo ${file.name} (${file.length()} B) a bucket=$bucketId")
+
             // Empaquetamos el archivo con InputFile de Appwrite
             val inputFile = InputFile.fromPath(file.absolutePath)
 
@@ -45,8 +48,10 @@ class AppwriteStorageRepository {
 
             // Construimos la URL de acceso directo
             val downloadUrl = "${AppwriteClient.endpoint}/storage/buckets/$bucketId/files/${response.id}/view?project=${AppwriteClient.projectId}"
+            Log.d("AppwriteStorage", "Subida OK id=${response.id}")
             Result.success(downloadUrl)
         } catch (e: Exception) {
+            Log.e("AppwriteStorage", "Error subiendo '$nombreArchivo' a bucket=${AppwriteClient.bucketId}: ${e.message}", e)
             Result.failure(e)
         }
     }

@@ -1,5 +1,6 @@
 package com.example.gsm.data.repository
 
+import com.example.gsm.data.local.dao.UsuarioDao
 import com.example.gsm.data.local.entity.EvidenciaEntity
 import com.example.gsm.data.local.model.ConteoPorTecnicoDto
 import com.example.gsm.data.model.CategoriaSolicitud
@@ -9,12 +10,11 @@ import com.example.gsm.data.model.PrioridadSolicitud
 import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Solicitud
 import com.example.gsm.data.model.Usuario
+import com.example.gsm.util.ArchivoAdjunto
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import android.util.Log
 
 /**
@@ -26,77 +26,49 @@ class GsmRepository(
     private val localRepo: SolicitudLocalRepository,
     private val historialRepo: HistorialRepository,
     private val notificacionRepo: NotificacionRepository,
-    private val whatsAppRepo: WhatsAppRepository,
     private val evidenciaRepo: EvidenciaRepository? = null,
     private val firebaseRepo: FirebaseSolicitudRepository? = null,
-    private val appwriteStorageRepo: AppwriteStorageRepository? = null
+    private val appwriteStorageRepo: AppwriteStorageRepository? = null,
+    private val usuarioDao: UsuarioDao? = null
 ) {
 
-    // -------------------------------------------------------------
-    /**
-     * Sincronización bidireccional en tiempo real (Patrón KISS).
-     * Escucha en vivo las solicitudes modificadas o creadas en la Web (Firestore)
-     * y las replica en Room para que la pantalla del celular reaccione al instante.
-     */
-    fun iniciarSincronizacionBidireccional(scope: CoroutineScope) {
-        firebaseRepo?.escucharSolicitudes()
-            ?.catch { e -> Log.e("FirebaseSync", "Error en flujo de solicitudes: ${e.message}", e) }
-            ?.onEach { solicitudesRemotas ->
-                solicitudesRemotas.forEach { solicitud ->
-                    localRepo.guardarOActualizar(solicitud)
-                }
-            }
-            ?.launchIn(scope)
-    }
+    private val syncCoordinator = GsmSyncCoordinator(
+        localRepo = localRepo,
+        historialRepo = historialRepo,
+        notificacionRepo = notificacionRepo,
+        firebaseRepo = firebaseRepo,
+        appwriteStorageRepo = appwriteStorageRepo,
+        usuarioDao = usuarioDao
+    )
 
-    /**
-     * Sincronización en tiempo real del chat de un ticket (Firestore -> Room).
-     * Retorna el Job activo para permitir cancelación y evitar listeners duplicados.
-     */
-    fun iniciarSincronizacionHistorial(codigoSeguimiento: String, solicitudIdLocal: Int, scope: CoroutineScope): Job? {
-        val codigoLimpio = codigoSeguimiento.trim()
-        if (codigoLimpio.isBlank()) return null
+    val ultimoErrorSync: StateFlow<String?> = syncCoordinator.ultimoErrorSync
 
-        return firebaseRepo?.escucharHistorialChat(codigoLimpio)
-            ?.catch { e -> Log.e("FirebaseSync", "Error en flujo historial chat: ${e.message}", e) }
-            ?.onEach { mensajesRemotos ->
-                val ticketLocal = localRepo.obtenerPorCodigo(codigoLimpio)
-                val targetSolId = ticketLocal?.id ?: solicitudIdLocal
-                if (targetSolId <= 0) return@onEach
+    fun limpiarErrorSync() = syncCoordinator.limpiarErrorSync()
 
-                mensajesRemotos.forEach { msg ->
-                    // Mapeo seguro de usuarioId para respetar integridad referencial de SQLite (Mocks y Nuevos)
-                    val usuariosMock = listOf(1, 2, 3, 4, 5, 99)
-                    val usuarioIdSeguro = when {
-                        msg.usuarioId in usuariosMock -> msg.usuarioId
-                        msg.usuarioId > 0 -> msg.usuarioId
-                        else -> when (msg.perfilUsuario) {
-                            RolUsuario.ADMINISTRADOR -> 2
-                            RolUsuario.TECNICO -> 3
-                            RolUsuario.CLIENTE -> 1
-                        }
-                    }
+    fun iniciarSincronizacionBidireccional(scope: CoroutineScope) =
+        syncCoordinator.iniciarSincronizacionBidireccional(scope)
 
-                    historialRepo.registrarSiNoExiste(
-                        solicitudId = targetSolId,
-                        usuarioId = usuarioIdSeguro,
-                        perfil = msg.perfilUsuario,
-                        estadoAnterior = msg.estadoAnterior?.name,
-                        estadoNuevo = msg.estadoNuevo.name,
-                        accion = msg.accion,
-                        comentario = msg.comentario,
-                        esComentarioInterno = msg.esComentarioInterno,
-                        evidenciaAdjunta = msg.evidenciaAdjunta,
-                        fechaCambio = msg.fechaCambio
-                    )
-                }
-            }
-            ?.launchIn(scope)
+    fun iniciarSincronizacionHistorial(codigoSeguimiento: String, solicitudIdLocal: Int, scope: CoroutineScope): Job? =
+        syncCoordinator.iniciarSincronizacionHistorial(codigoSeguimiento, solicitudIdLocal, scope)
+
+    suspend fun sincronizarArchivoRemoto(limite: Long = 500) =
+        syncCoordinator.sincronizarArchivoRemoto(limite)
+
+    suspend fun contarTotalTicketsRemotos(): Long? =
+        syncCoordinator.contarTotalTicketsRemotos()
+
+    private fun reportarSiFalla(res: Result<*>?, mensaje: String) {
+        if (res != null && res.isFailure) {
+            syncCoordinator.reportarErrorSync(mensaje)
+        }
     }
 
     private suspend fun syncFirestore(solicitudId: Int) {
         val s = localRepo.obtenerPorId(solicitudId) ?: return
-        runCatching { firebaseRepo?.guardarSolicitud(s) }
+        syncCoordinator.registrarCambioLocal(s.codigoSeguimiento)
+        val res = runCatching { firebaseRepo?.guardarSolicitud(s) }
+            .fold(onSuccess = { it }, onFailure = { Result.failure<String>(it) })
+        reportarSiFalla(res, "Cambio guardado local; pendiente de sincronizar con Firestore.")
     }
 
     /**
@@ -132,8 +104,17 @@ class GsmRepository(
             ahora = ahora
         )
 
-        // 2. Sincronizar en tiempo real con Firestore con el texto exacto
-        runCatching {
+        // 2. Si hay imagen/archivo local, intenta subir a Appwrite Storage para que otros dispositivos la vean por URL
+        val evidenciaParaNube = if (tieneEvidencia && !evidenciaAdjunta!!.startsWith("http")) {
+            val nombreAdjunto = evidenciaAdjunta.substringAfterLast('/').ifBlank { "chat_$ahora.jpg" }
+            subirEvidenciaSiLocal(nombreAdjunto, evidenciaAdjunta) ?: evidenciaAdjunta
+        } else {
+            evidenciaAdjunta
+        }
+
+        // 3. Sincronizar en tiempo real con Firestore con el texto exacto y URL en la nube
+        syncCoordinator.registrarCambioLocal(solicitud.codigoSeguimiento, ahora)
+        val resEnvio = runCatching {
             firebaseRepo?.enviarMensajeChat(
                 codigoSeguimiento = solicitud.codigoSeguimiento,
                 solicitudId = solicitudId,
@@ -142,24 +123,47 @@ class GsmRepository(
                 autorRol = usuario.rol,
                 mensaje = mensajeLimpio,
                 esInterno = esInterno,
-                evidenciaAdjunta = evidenciaAdjunta,
+                evidenciaAdjunta = evidenciaParaNube,
                 accion = "MENSAJE",
                 fecha = ahora
             )
-        }
+        }.fold(onSuccess = { it }, onFailure = { Result.failure<String>(it) })
+        reportarSiFalla(resEnvio, "Mensaje guardado local; pendiente de enviar a la nube.")
     }
 
     suspend fun actualizarInformacionSolicitud(
         solicitudId: Int,
         nuevoTitulo: String,
         nuevaDescripcion: String,
-        usuario: Usuario
+        usuario: Usuario,
+        nuevaCategoria: CategoriaSolicitud? = null,
+        nuevoServicio: String? = null,
+        nuevoActivo: String? = null
     ): Result<Unit> = runCatching {
         require(nuevoTitulo.isNotBlank()) { "El título no puede estar vacío" }
         require(nuevaDescripcion.isNotBlank()) { "La descripción no puede estar vacía" }
         val actual = localRepo.obtenerPorId(solicitudId) ?: throw IllegalArgumentException("Solicitud no encontrada")
         val ahora = System.currentTimeMillis()
-        localRepo.actualizarInformacion(solicitudId, nuevoTitulo.trim(), nuevaDescripcion.trim(), ahora)
+        localRepo.actualizarInformacion(
+            id = solicitudId,
+            nuevoTitulo = nuevoTitulo.trim(),
+            nuevaDescripcion = nuevaDescripcion.trim(),
+            categoria = nuevaCategoria ?: actual.categoria,
+            servicioRelacionado = nuevoServicio?.trim()?.ifBlank { null },
+            activoRelacionado = nuevoActivo?.trim()?.ifBlank { null },
+            ahora = ahora
+        )
+        historialRepo.registrarEvento(
+            solicitudId = solicitudId,
+            usuarioId = usuario.id,
+            perfil = usuario.rol,
+            estadoAnterior = actual.estado.name,
+            estadoNuevo = actual.estado.name,
+            accion = "EDICION",
+            comentario = "Información del ticket actualizada.",
+            esComentarioInterno = false,
+            ahora = ahora
+        )
         syncFirestore(solicitudId)
     }
 
@@ -178,6 +182,7 @@ class GsmRepository(
         tipoArchivoEvidencia: String? = null,
         tamanoArchivoEvidencia: Long? = null,
         uriEvidencia: String? = null,
+        evidencias: List<ArchivoAdjunto> = emptyList(),
         esBorrador: Boolean = false
     ): Result<Solicitud> {
         return try {
@@ -185,9 +190,24 @@ class GsmRepository(
                 "El título y la descripción son obligatorios."
             }
 
+            if (!esBorrador && cliente.rol == RolUsuario.CLIENTE) {
+                val disponibles = usuarioDao?.obtenerUsuarioPorId(cliente.id)?.ticketsDisponibles ?: cliente.ticketsDisponibles
+                require(disponibles > 0) {
+                    "No tienes tickets disponibles en tu plan actual. Activa o renueva tu suscripción para crear solicitudes."
+                }
+                val empresaCliente = cliente.empresa.orEmpty()
+                if (empresaCliente.isNotBlank()) {
+                    usuarioDao?.descontarTicketEmpresa(empresaCliente)
+                } else {
+                    usuarioDao?.descontarTicketDisponible(cliente.id)
+                }
+            }
+
             val ahora = System.currentTimeMillis()
-            val codigo = localRepo.generarCodigoUnico()
+            val codigo = localRepo.generarCodigoUnico() // Generación del código único oficial del ticket  Ej: SOL-2026-100X
+            // Cálculo automático del plazo según nivel SLA
             val fechaLimite = localRepo.calcularSlaFechaLimite(prioridad, ahora)
+
 
             val nuevaSolicitud = Solicitud(
                 id = 0,
@@ -209,64 +229,106 @@ class GsmRepository(
             val idGenerado = localRepo.insertar(nuevaSolicitud, esBorrador).toInt()
             val solicitudGuardada = nuevaSolicitud.copy(id = idGenerado)
 
-            // Si viene con evidencia ficticia adjunta, la registramos (Criterio 3)
-            if (!nombreArchivoEvidencia.isNullOrBlank()) {
+            // Unifica adjuntos múltiples (o el parámetro único heredado por compatibilidad con tests).
+            val listaEvidencias = evidencias.ifEmpty {
+                if (!nombreArchivoEvidencia.isNullOrBlank()) {
+                    listOf(
+                        ArchivoAdjunto(
+                            nombre = nombreArchivoEvidencia,
+                            tipoMime = tipoArchivoEvidencia ?: "image/png",
+                            tamanoBytes = tamanoArchivoEvidencia ?: 250_000L,
+                            uriString = uriEvidencia.orEmpty()
+                        )
+                    )
+                } else emptyList()
+            }
+
+            // Sube cada adjunto a Appwrite antes de persistir; si está offline conserva file:// para reintento.
+            val adjuntosProcesados = listaEvidencias.mapIndexed { idx, adjunto ->
+                val urlNube = if (!esBorrador && adjunto.uriString.isNotBlank()) {
+                    subirEvidenciaSiLocal(adjunto.nombre, adjunto.uriString)
+                } else {
+                    null
+                }
+                val uriFinal = urlNube ?: adjunto.uriString.ifBlank { null }
+
                 evidenciaRepo?.adjuntarEvidencia(
                     solicitudId = idGenerado,
                     usuarioId = cliente.id,
-                    nombreArchivo = nombreArchivoEvidencia,
-                    tipoArchivo = tipoArchivoEvidencia ?: "image/png",
-                    tamanoBytes = tamanoArchivoEvidencia ?: 250_000L,
-                    uriLocal = uriEvidencia,
-                    descripcion = "Evidencia inicial adjuntada al crear la solicitud",
-                    ahora = ahora
+                    nombreArchivo = adjunto.nombre,
+                    tipoArchivo = adjunto.tipoMime,
+                    tamanoBytes = adjunto.tamanoBytes,
+                    uriLocal = uriFinal,
+                    descripcion = "Evidencia adjuntada al crear la solicitud (${idx + 1})",
+                    ahora = ahora + idx
                 )
+                Triple(adjunto, uriFinal, urlNube)
             }
 
-            // Si no es borrador, registramos el primer hito formal de auditoría (Criterio 6)
+            // Registra hitos de auditoría y replica en Firestore cada adjunto que ya obtuvo URL http.
             if (!esBorrador) {
-                historialRepo.registrarEvento(
-                    solicitudId = idGenerado,
-                    usuarioId = cliente.id,
-                    perfil = cliente.rol,
-                    estadoAnterior = null,
-                    estadoNuevo = EstadoSolicitud.RECIBIDA.name,
-                    accion = "CREACION",
-                    comentario = "Solicitud ingresada formalmente por el cliente.",
-                    esComentarioInterno = false,
-                    evidenciaAdjunta = nombreArchivoEvidencia,
-                    ahora = ahora
-                )
-            }
-
-            // Sincronización transparente con Firebase (Offline-First)
-            if (!esBorrador) {
-                runCatching { firebaseRepo?.guardarSolicitud(solicitudGuardada) }
-            }
-            if (!nombreArchivoEvidencia.isNullOrBlank() && !uriEvidencia.isNullOrBlank()) {
-                runCatching { appwriteStorageRepo?.subirEvidencia(nombreArchivoEvidencia, uriEvidencia) }
+                if (adjuntosProcesados.isEmpty()) {
+                    historialRepo.registrarEvento(
+                        solicitudId = idGenerado,
+                        usuarioId = cliente.id,
+                        perfil = cliente.rol,
+                        estadoAnterior = null,
+                        estadoNuevo = EstadoSolicitud.RECIBIDA.name,
+                        accion = "CREACION",
+                        comentario = "Solicitud ingresada formalmente por el cliente.",
+                        esComentarioInterno = false,
+                        evidenciaAdjunta = null,
+                        ahora = ahora
+                    )
+                } else {
+                    adjuntosProcesados.forEachIndexed { idx, (adjunto, uriFinal, urlNube) ->
+                        val accion = if (idx == 0) "CREACION" else "EVIDENCIA"
+                        val comentario = if (idx == 0) {
+                            "Solicitud ingresada formalmente por el cliente."
+                        } else {
+                            "Evidencia adjunta: ${adjunto.nombre}"
+                        }
+                        historialRepo.registrarEvento(
+                            solicitudId = idGenerado,
+                            usuarioId = cliente.id,
+                            perfil = cliente.rol,
+                            estadoAnterior = if (idx == 0) null else EstadoSolicitud.RECIBIDA.name,
+                            estadoNuevo = EstadoSolicitud.RECIBIDA.name,
+                            accion = accion,
+                            comentario = comentario,
+                            esComentarioInterno = false,
+                            evidenciaAdjunta = uriFinal ?: adjunto.nombre,
+                            ahora = ahora + idx
+                        )
+                        // Solo replica en Firestore cuando hay URL http pública; si es file:// se sube al reconectar.
+                        if (!urlNube.isNullOrBlank()) {
+                            runCatching {
+                                firebaseRepo?.enviarMensajeChat(
+                                    codigoSeguimiento = codigo,
+                                    solicitudId = idGenerado,
+                                    usuarioId = cliente.id,
+                                    autorNombre = cliente.nombre,
+                                    autorRol = cliente.rol,
+                                    mensaje = comentario,
+                                    esInterno = false,
+                                    evidenciaAdjunta = urlNube,
+                                    accion = accion,
+                                    fecha = ahora + idx
+                                )
+                            }
+                        }
+                    }
+                }
+                syncCoordinator.registrarCambioLocal(solicitudGuardada.codigoSeguimiento)
+                val resGuardar = runCatching { firebaseRepo?.guardarSolicitud(solicitudGuardada) }
+                    .fold(onSuccess = { it }, onFailure = { Result.failure<String>(it) })
+                reportarSiFalla(resGuardar, "Ticket guardado local; pendiente de sincronizar con Firestore.")
             }
 
             Result.success(solicitudGuardada)
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    suspend fun guardarBorrador(
-        titulo: String,
-        descripcion: String,
-        categoria: CategoriaSolicitud,
-        cliente: Usuario
-    ): Result<Solicitud> {
-        return crearSolicitud(
-            titulo = titulo,
-            descripcion = descripcion,
-            categoria = categoria,
-            prioridad = PrioridadSolicitud.BAJA,
-            cliente = cliente,
-            esBorrador = true
-        )
     }
 
     // -------------------------------------------------------------
@@ -614,17 +676,20 @@ class GsmRepository(
     suspend fun confirmarCierre(
         solicitudId: Int,
         usuario: Usuario,
-        conforme: Boolean = true
+        conforme: Boolean = true,
+        calificacion: Int? = null
     ): Result<Unit> = runCatching {
         require(usuario.rol == RolUsuario.CLIENTE || usuario.rol == RolUsuario.ADMINISTRADOR) {
             "Acceso denegado: Solo el cliente o el administrador pueden dar cierre de conformidad."
         }
+        val calificacionValida = calificacion?.coerceIn(1, 5)
         val ahora = System.currentTimeMillis()
         val solicitud = localRepo.obtenerPorId(solicitudId)
             ?: throw IllegalArgumentException("Solicitud no encontrada.")
 
-        localRepo.confirmarCierre(solicitudId, conforme, ahora)
+        localRepo.confirmarCierre(solicitudId, conforme, ahora, calificacionValida)
 
+        val sufijoNota = calificacionValida?.let { " (Calificación: $it/5 ★)" }.orEmpty()
         historialRepo.registrarEvento(
             solicitudId = solicitudId,
             usuarioId = usuario.id,
@@ -632,7 +697,7 @@ class GsmRepository(
             estadoAnterior = solicitud.estado.name,
             estadoNuevo = EstadoSolicitud.CERRADA.name,
             accion = "CIERRE",
-            comentario = if (conforme) "Cliente confirma conformidad con la solución." else "Cierre registrado por administración.",
+            comentario = (if (conforme) "Cliente confirma conformidad con la solución." else "Cierre registrado por administración.") + sufijoNota,
             ahora = ahora
         )
         syncFirestore(solicitudId)
@@ -705,7 +770,8 @@ class GsmRepository(
         )
 
         // 2. Chat en tiempo real para alertar de inmediato a soporte y al administrador
-        runCatching {
+        syncCoordinator.registrarCambioLocal(solicitud.codigoSeguimiento, ahora)
+        val resCancelChat = runCatching {
             firebaseRepo?.enviarMensajeChat(
                 codigoSeguimiento = solicitud.codigoSeguimiento,
                 solicitudId = solicitudId,
@@ -717,7 +783,8 @@ class GsmRepository(
                 accion = "SOLICITUD_CANCELACION",
                 fecha = ahora
             )
-        }
+        }.fold(onSuccess = { it }, onFailure = { Result.failure<String>(it) })
+        reportarSiFalla(resCancelChat, "Solicitud de anulación guardada local; pendiente de sincronizar con la nube.")
 
         syncFirestore(solicitudId)
     }
@@ -773,8 +840,6 @@ class GsmRepository(
 
     fun listarAtrasadas(): Flow<List<Solicitud>> = localRepo.obtenerAtrasadas()
 
-    fun listarBorradores(clienteId: Int): Flow<List<Solicitud>> = localRepo.obtenerBorradores(clienteId)
-
     fun obtenerHistorial(solicitudId: Int, rol: RolUsuario): Flow<List<Historial>> =
         historialRepo.obtenerHistorial(solicitudId, rol)
 
@@ -789,20 +854,67 @@ class GsmRepository(
     ): Result<Long> {
         val repo = evidenciaRepo
             ?: return Result.failure(IllegalStateException("EvidenciaRepository no inicializado."))
+        val ahora = System.currentTimeMillis()
+        // Sube primero a Appwrite; si está offline, guarda la ruta local para reintento automático
+        val urlNube = if (!nombreArchivo.isBlank() && !uriLocal.isNullOrBlank()) {
+            subirEvidenciaSiLocal(nombreArchivo, uriLocal)
+        } else {
+            null
+        }
+        val uriFinal = urlNube ?: uriLocal
+
         val resultado = repo.adjuntarEvidencia(
             solicitudId = solicitudId,
             usuarioId = usuario.id,
             nombreArchivo = nombreArchivo,
             tipoArchivo = tipoArchivo,
             tamanoBytes = tamanoBytes,
-            uriLocal = uriLocal,
-            descripcion = descripcion
+            uriLocal = uriFinal,
+            descripcion = descripcion,
+            ahora = ahora
         )
-        if (resultado.isSuccess && !nombreArchivo.isBlank() && !uriLocal.isNullOrBlank()) {
-            runCatching { appwriteStorageRepo?.subirEvidencia(nombreArchivo, uriLocal) }
+
+        if (resultado.isSuccess && !uriFinal.isNullOrBlank()) {
+            val sol = localRepo.obtenerPorId(solicitudId)
+            val estadoActual = sol?.estado?.name ?: EstadoSolicitud.EN_PROCESO.name
+            val textoEvento = "Evidencia adjunta: $nombreArchivo"
+            historialRepo.registrarEvento(
+                solicitudId = solicitudId,
+                usuarioId = usuario.id,
+                perfil = usuario.rol,
+                estadoAnterior = estadoActual,
+                estadoNuevo = estadoActual,
+                accion = "EVIDENCIA",
+                comentario = textoEvento,
+                esComentarioInterno = false,
+                evidenciaAdjunta = uriFinal,
+                ahora = ahora
+            )
+            // Solo replica en Firestore cuando existe URL http pública; si es local, se sube al reconectar
+            if (sol != null && !urlNube.isNullOrBlank()) {
+                syncCoordinator.registrarCambioLocal(sol.codigoSeguimiento, ahora)
+                val resEvidencia = runCatching {
+                    firebaseRepo?.enviarMensajeChat(
+                        codigoSeguimiento = sol.codigoSeguimiento,
+                        solicitudId = solicitudId,
+                        usuarioId = usuario.id,
+                        autorNombre = usuario.nombre,
+                        autorRol = usuario.rol,
+                        mensaje = textoEvento,
+                        esInterno = false,
+                        evidenciaAdjunta = urlNube,
+                        accion = "EVIDENCIA",
+                        fecha = ahora
+                    )
+                }.fold(onSuccess = { it }, onFailure = { Result.failure<String>(it) })
+                reportarSiFalla(resEvidencia, "Evidencia guardada local; pendiente de replicar en la nube.")
+            }
         }
         return resultado
     }
+
+    private suspend fun subirEvidenciaSiLocal(nombreArchivo: String, uriLocal: String): String? =
+        syncCoordinator.subirEvidenciaSiLocal(nombreArchivo, uriLocal)
 
     fun obtenerEvidencias(solicitudId: Int): Flow<List<EvidenciaEntity>>? =
         evidenciaRepo?.obtenerPorSolicitud(solicitudId)
@@ -821,14 +933,8 @@ class GsmRepository(
     fun metricasAtrasadas(): Flow<Int> = localRepo.contarAtrasadas()
     fun metricasPorPrioridad(prioridad: PrioridadSolicitud): Flow<Int> = localRepo.contarPorPrioridad(prioridad)
     fun metricasPorTecnico(): Flow<List<ConteoPorTecnicoDto>> = localRepo.contarPorTecnico()
+    fun metricasPromedioCsat(): Flow<Double?> = localRepo.promedioCalificacion()
 
-    // -------------------------------------------------------------
-    // 5. APARTADO WHATSAPP (Mensaje + Animación simulada)
-    // -------------------------------------------------------------
-
-    fun formatearMensajeWhatsApp(solicitud: Solicitud, clienteNombre: String? = null): String =
-        whatsAppRepo.crearMensajeEstructurado(solicitud, clienteNombre)
-
-    suspend fun simularEnvioWhatsApp(solicitud: Solicitud): Boolean =
-        whatsAppRepo.simularEnvio(solicitud)
+    suspend fun obtenerIdsClientesEmpresa(empresa: String): List<Int> =
+        if (empresa.isBlank()) emptyList() else usuarioDao?.obtenerIdsPorEmpresa(empresa) ?: emptyList()
 }

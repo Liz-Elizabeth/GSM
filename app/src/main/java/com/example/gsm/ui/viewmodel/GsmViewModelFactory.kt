@@ -1,5 +1,6 @@
 package com.example.gsm.ui.viewmodel
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.gsm.data.repository.GsmRepository
@@ -11,14 +12,15 @@ import com.example.gsm.data.repository.UsuarioRepository
  */
 class GsmViewModelFactory(
     private val gsmRepo: GsmRepository,
-    private val usuarioRepo: UsuarioRepository
+    private val usuarioRepo: UsuarioRepository,
+    private val sessionPrefs: SharedPreferences? = null
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
             modelClass.isAssignableFrom(AuthViewModel::class.java) -> {
-                AuthViewModel(usuarioRepo) as T
+                AuthViewModel(usuarioRepo, sessionPrefs) as T
             }
             modelClass.isAssignableFrom(SolicitudViewModel::class.java) -> {
                 SolicitudViewModel(gsmRepo) as T

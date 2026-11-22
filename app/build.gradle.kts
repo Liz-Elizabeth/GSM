@@ -15,8 +15,8 @@ val localProperties = Properties().apply {
     }
 }
 
-val flowApiKey = localProperties.getProperty("FLOW_API_KEY") ?: "22F98890-9CA6-4340-8D6D-619FECLE9C60"
-val flowSecretKey = localProperties.getProperty("FLOW_SECRET_KEY") ?: "e000adf9c0031971903596a1e91ddb2809e4e5e5"
+val flowApiKey = localProperties.getProperty("FLOW_API_KEY") ?: ""
+val flowSecretKey = localProperties.getProperty("FLOW_SECRET_KEY") ?: ""
 val flowEnv = localProperties.getProperty("FLOW_ENVIRONMENT") ?: "sandbox"
 val appwriteEndpoint = localProperties.getProperty("APPWRITE_ENDPOINT") ?: "https://nyc.cloud.appwrite.io/v1"
 val appwriteProjectId = localProperties.getProperty("APPWRITE_PROJECT_ID") ?: "6ae91595000d83e34686"

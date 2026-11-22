@@ -19,7 +19,11 @@ import java.util.concurrent.TimeUnit
  * Repositorio oficial para la pasarela de pagos Flow (Chile).
  * Gestiona la creación de órdenes de pago seguras y la verificación de estados con Flow / Webpay Plus.
  */
-class FlowPaymentRepository {
+class FlowPaymentRepository(
+    private val apiServiceOverride: FlowApiService? = null,
+    apiKeyOverride: String? = null,
+    secretKeyOverride: String? = null
+) {
 
     private val tag = "FlowPayment"
 
@@ -30,26 +34,28 @@ class FlowPaymentRepository {
         "https://sandbox.flow.cl/api/"
     }
 
-    private val apiKey = BuildConfig.FLOW_API_KEY.ifBlank { "MOCK_API_KEY" }
-    private val secretKey = BuildConfig.FLOW_SECRET_KEY.ifBlank { "MOCK_SECRET_KEY" }
+    private val apiKey = (apiKeyOverride ?: BuildConfig.FLOW_API_KEY).ifBlank { "MOCK_API_KEY" }
+    private val secretKey = (secretKeyOverride ?: BuildConfig.FLOW_SECRET_KEY).ifBlank { "MOCK_SECRET_KEY" }
 
     private val apiService: FlowApiService by lazy {
-        val logging = HttpLoggingInterceptor().apply {
-            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+        apiServiceOverride ?: run {
+            val logging = HttpLoggingInterceptor().apply {
+                level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+            }
+
+            val okHttpClient = OkHttpClient.Builder()
+                .addInterceptor(logging)
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .build()
+
+            Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .client(okHttpClient)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(FlowApiService::class.java)
         }
-
-        val okHttpClient = OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .build()
-
-        Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(FlowApiService::class.java)
     }
 
     /**
@@ -89,7 +95,7 @@ class FlowPaymentRepository {
 
         // Si estamos con llaves mock para pruebas locales o demo offline
         if (apiKey == "MOCK_API_KEY" || secretKey == "MOCK_SECRET_KEY") {
-            Log.d(tag, "Modo Demo Sandbox Local activado para orden $ordenId")
+            runCatching { Log.d(tag, "Modo Demo Sandbox Local activado para orden $ordenId") }
             val tokenDemo = "DEMO_TOKEN_${UUID.randomUUID().toString().take(12)}"
             val urlDemo = "https://gsm-web-delta.vercel.app/planes/simulador?token=$tokenDemo&order=$ordenId&plan=${plan.idPlan}&monto=$monto"
             return Result.success(FlowCreateResponse(url = urlDemo, token = tokenDemo, flowOrder = 999901))
@@ -97,10 +103,10 @@ class FlowPaymentRepository {
 
         return try {
             val response = apiService.crearOrdenPago(params)
-            Log.d(tag, "Orden Flow creada exitosamente: ${response.token}")
+            runCatching { Log.d(tag, "Orden Flow creada exitosamente: ${response.token}") }
             Result.success(response)
         } catch (e: Exception) {
-            Log.w(tag, "Aviso en API de Flow (${e.message}), activando pasarela sandbox oficial en Vercel")
+            runCatching { Log.w(tag, "Aviso en API de Flow (${e.message}), activando pasarela sandbox oficial en Vercel") }
             // Fallback elegante al simulador oficial de Flow en Vercel para evitar pantalla de error en Flow Sandbox
             val tokenDemo = "DEMO_TOKEN_${UUID.randomUUID().toString().take(12)}"
             val urlDemo = "https://gsm-web-delta.vercel.app/planes/simulador?token=$tokenDemo&order=$ordenId&plan=${plan.idPlan}&monto=$monto"
@@ -137,7 +143,7 @@ class FlowPaymentRepository {
             val status = apiService.consultarEstadoPago(apiKey, token, firma)
             Result.success(status)
         } catch (e: Exception) {
-            Log.e(tag, "Error consultando estado en Flow: ${e.message}", e)
+            runCatching { Log.e(tag, "Error consultando estado en Flow: ${e.message}", e) }
             Result.failure(e)
         }
     }

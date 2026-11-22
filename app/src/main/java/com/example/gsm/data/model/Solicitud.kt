@@ -16,6 +16,7 @@ data class Solicitud(
     val motivoCancelacion: String? = null,
     val motivoReapertura: String? = null,
     val conformidadCliente: Boolean? = null,
+    val calificacionCliente: Int? = null, // CSAT 1..5 estrellas al cerrar el ticket
     val fechaLimite: Long? = null, // Para cálculo de solicitudes atrasadas
     val fechaCreacion: Long = System.currentTimeMillis(),
     val fechaActualizacion: Long = System.currentTimeMillis(),

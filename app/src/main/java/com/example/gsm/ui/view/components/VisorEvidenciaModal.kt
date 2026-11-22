@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,9 +60,10 @@ fun VisorEvidenciaModal(
             evidencia.nombreArchivo.endsWith(".csv", ignoreCase = true) ||
             evidencia.nombreArchivo.endsWith(".json", ignoreCase = true)
 
-    val bitmap = remember(evidencia.uriString) {
-        if (esImagen) FileUtil.cargarBitmapDesdeUri(context, evidencia.uriString) else null
-    }
+    // Decodificación asíncrona para no bloquear el hilo UI al abrir fotos grandes
+    val bitmap = produceState<android.graphics.Bitmap?>(initialValue = null, evidencia.uriString, esImagen) {
+        value = if (esImagen) FileUtil.cargarBitmapAsync(context, evidencia.uriString) else null
+    }.value
 
     val textoLeido = remember(evidencia.uriString) {
         if (esTexto) FileUtil.leerTextoDesdeUri(context, evidencia.uriString) else null

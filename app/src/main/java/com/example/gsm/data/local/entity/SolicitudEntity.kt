@@ -46,6 +46,7 @@ data class SolicitudEntity(
     val motivoCancelacion: String? = null,
     val motivoReapertura: String? = null,
     val conformidadCliente: Boolean? = null,
+    val calificacionCliente: Int? = null,
     val fechaLimite: Long? = null, // SLA / fecha máxima para cálculo de atrasos
     val esBorrador: Boolean = false, // True si aún no se envía al administrador
     val fechaCreacion: Long = System.currentTimeMillis(),

@@ -8,20 +8,25 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
  * Servicio de Notificaciones Push Nativas con Firebase Cloud Messaging (FCM).
- * Maneja la recepción de cargas útiles en primer plano, segundo plano y estado terminado.
  */
 class GsmFirebaseMessagingService : FirebaseMessagingService() {
 
-    private val serviceScope = CoroutineScope(Dispatchers.IO)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
+    }
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d(TAG, "Nuevo FCM Token recibido: $token")
-        // Almacenamos el token para asociación de usuario
+        Log.d(TAG, "Nuevo FCM Token recibido")
         getSharedPreferences("gsm_fcm_prefs", MODE_PRIVATE)
             .edit()
             .putString("fcm_token", token)
@@ -30,53 +35,51 @@ class GsmFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
-        Log.d(TAG, "Mensaje Push recibido desde: ${remoteMessage.from}")
+        Log.d(TAG, "Mensaje Push recibido")
 
-        // 1. Extraer título y cuerpo desde la notificación o data payload
         val titulo = remoteMessage.notification?.title
             ?: remoteMessage.data["title"]
-            ?: remoteMessage.data["titulo"]
             ?: "GSM Soporte Técnico"
 
-        val cuerpo = remoteMessage.notification?.body
+        val rawCuerpo = remoteMessage.notification?.body
             ?: remoteMessage.data["body"]
-            ?: remoteMessage.data["mensaje"]
-            ?: remoteMessage.data["message"]
             ?: "Tienes una nueva actualización en tu solicitud."
+        val cuerpo = if (rawCuerpo.startsWith("ENC:")) {
+            "Tienes un nuevo mensaje en tu ticket."
+        } else {
+            rawCuerpo
+        }
 
-        val solicitudId = remoteMessage.data["solicitudId"]?.toIntOrNull()
-            ?: remoteMessage.data["solicitud_id"]?.toIntOrNull()
-            ?: 0
-
-        val codigoTicket = remoteMessage.data["codigo"]
-            ?: remoteMessage.data["codigoSeguimiento"]
-
-        val tipoEvento = remoteMessage.data["tipo"]
-            ?: remoteMessage.data["tipoEvento"]
-            ?: "PUSH_REMOTO"
-
-        val esChat = tipoEvento.contains("CHAT", ignoreCase = true) ||
-                tipoEvento.contains("MENSAJE", ignoreCase = true)
-
-        // 2. Desplegar notificación emergente nativa con NotificationManager
-        GsmNotificationHelper.mostrarNotificacionNativa(
-            context = applicationContext,
-            titulo = titulo,
-            mensaje = cuerpo,
-            solicitudId = solicitudId,
-            codigoTicket = codigoTicket,
-            esChat = esChat
-        )
-
-        // 3. Persistir en la base de datos Room para la bandeja de notificaciones interna
+        val solicitudIdDirecto = remoteMessage.data["solicitudId"]?.toIntOrNull() ?: 0
+        val codigoTicket = remoteMessage.data["codigoSeguimiento"]
+        val tipoEvento = remoteMessage.data["tipo"] ?: "PUSH_REMOTO"
         val usuarioDestinoId = remoteMessage.data["usuarioDestinoId"]?.toIntOrNull() ?: 1
+        val esChat = tipoEvento.contains("CHAT", ignoreCase = true) ||
+            tipoEvento.contains("MENSAJE", ignoreCase = true)
+
+        // Resuelve solicitudId por código si el payload solo trajo codigoSeguimiento para abrir el ticket correcto
         serviceScope.launch {
             try {
                 val db = GsmDatabase.getInstance(applicationContext)
+                val solicitudIdResuelto = if (!codigoTicket.isNullOrBlank()) {
+                    db.solicitudDao().obtenerPorCodigoSeguimiento(codigoTicket)?.id ?: solicitudIdDirecto
+                } else {
+                    solicitudIdDirecto
+                }
+
+                GsmNotificationHelper.mostrarNotificacionNativa(
+                    context = applicationContext,
+                    titulo = titulo,
+                    mensaje = cuerpo,
+                    solicitudId = solicitudIdResuelto,
+                    codigoTicket = codigoTicket,
+                    esChat = esChat
+                )
+
                 db.notificacionDao().insertar(
                     NotificacionEntity(
                         usuarioDestinoId = usuarioDestinoId,
-                        solicitudId = solicitudId,
+                        solicitudId = solicitudIdResuelto,
                         titulo = titulo,
                         mensaje = cuerpo,
                         tipoEvento = tipoEvento,
@@ -85,7 +88,7 @@ class GsmFirebaseMessagingService : FirebaseMessagingService() {
                     )
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Error al persistir notificación push en Room: ${e.message}")
+                Log.e(TAG, "Error al procesar notificación push: ${e.message}")
             }
         }
     }

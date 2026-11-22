@@ -1,0 +1,12 @@
+{
+  "name": "gsm-functions",
+  "description": "Cloud Functions v2 para notificaciones push FCM de GSM",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.1"
+  }
+}

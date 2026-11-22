@@ -98,45 +98,18 @@ class MainActivity : ComponentActivity() {
             localRepo = SolicitudLocalRepository(db.solicitudDao(), db.usuarioDao()),
             historialRepo = HistorialRepository(db.historialDao()),
             notificacionRepo = NotificacionRepository(db.notificacionDao(), applicationContext),
-            whatsAppRepo = WhatsAppRepository(),
             evidenciaRepo = EvidenciaRepository(db.evidenciaDao()),
             firebaseRepo = FirebaseSolicitudRepository(),
-            appwriteStorageRepo = AppwriteStorageRepository()
+            appwriteStorageRepo = AppwriteStorageRepository(),
+            usuarioDao = db.usuarioDao()
         )
 
-        // 8. Sincronización bidireccional en tiempo real (Web <-> App) - Patrón KISS
-        lifecycleScope.launch {
-            kotlin.runCatching {
-                db.usuarioDao().insertarUsuarios(
-                    listOf(
-                        com.example.gsm.data.local.entity.UsuarioEntity(
-                            id = 5,
-                            nombre = "Carlos Ramos (Técnico Redes)",
-                            correo = "carlos@gsm.cl",
-                            password = "1234",
-                            rol = "TECNICO",
-                            empresa = "GSM Área Infraestructura",
-                            telefono = "+56900005555",
-                            medioContacto = "WhatsApp"
-                        ),
-                        com.example.gsm.data.local.entity.UsuarioEntity(
-                            id = 99,
-                            nombre = "Administrador GSM (Web)",
-                            correo = "adminweb@gsm.cl",
-                            password = "1234",
-                            rol = "ADMINISTRADOR",
-                            empresa = "GSM Servicios Digitales",
-                            telefono = "+56900009999",
-                            medioContacto = "WhatsApp"
-                        )
-                    )
-                )
-            }
-        }
+        // 8. Sincronización bidireccional en tiempo real (Web <-> App)
         gsmRepo.iniciarSincronizacionBidireccional(lifecycleScope)
 
         // 9. Creamos los ViewModels usando la fábrica
-        val factory = GsmViewModelFactory(gsmRepo, usuarioRepo)
+        val sessionPrefs = getSharedPreferences("gsm_session_prefs", MODE_PRIVATE)
+        val factory = GsmViewModelFactory(gsmRepo, usuarioRepo, sessionPrefs)
         val authVm = ViewModelProvider(this, factory)[AuthViewModel::class.java]
         val solicitudVm = ViewModelProvider(this, factory)[SolicitudViewModel::class.java]
         val detalleVm = ViewModelProvider(this, factory)[DetalleSolicitudViewModel::class.java]

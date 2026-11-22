@@ -8,8 +8,6 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.gsm.data.local.entity.SolicitudEntity
 import com.example.gsm.data.local.model.ConteoPorTecnicoDto
-import com.example.gsm.data.local.model.SolicitudConParticipantesDto
-import com.example.gsm.data.local.model.SolicitudDetalleCompletoDto
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -33,8 +31,16 @@ interface SolicitudDao {
     @Query("SELECT * FROM solicitudes WHERE UPPER(TRIM(codigoSeguimiento)) = UPPER(TRIM(:codigo)) LIMIT 1")
     suspend fun obtenerPorCodigoSeguimiento(codigo: String): SolicitudEntity?
 
-    @Query("UPDATE solicitudes SET titulo = :titulo, descripcion = :descripcion, fechaActualizacion = :ts WHERE id = :solicitudId")
-    suspend fun actualizarInformacion(solicitudId: Int, titulo: String, descripcion: String, ts: Long = System.currentTimeMillis())
+    @Query("UPDATE solicitudes SET titulo = :titulo, descripcion = :descripcion, categoria = :categoria, servicioRelacionado = :servicio, activoRelacionado = :activo, fechaActualizacion = :ts WHERE id = :solicitudId")
+    suspend fun actualizarInformacion(
+        solicitudId: Int,
+        titulo: String,
+        descripcion: String,
+        categoria: String,
+        servicio: String?,
+        activo: String?,
+        ts: Long = System.currentTimeMillis()
+    )
 
     // Borradores del cliente (PDF Pág. 6)
     @Query("SELECT * FROM solicitudes WHERE clienteId = :clienteId AND esBorrador = 1 ORDER BY fechaActualizacion DESC")
@@ -140,22 +146,15 @@ interface SolicitudDao {
     @Query("UPDATE solicitudes SET resolucion = :resolucion, estado = 'RESUELTA', fechaResolucion = :ts, fechaActualizacion = :ts WHERE id = :solicitudId")
     suspend fun registrarResolucion(solicitudId: Int, resolucion: String, ts: Long = System.currentTimeMillis())
 
-    @Query("UPDATE solicitudes SET conformidadCliente = :conforme, estado = 'CERRADA', fechaCierre = :ts, fechaActualizacion = :ts WHERE id = :solicitudId")
-    suspend fun confirmarCierre(solicitudId: Int, conforme: Boolean, ts: Long = System.currentTimeMillis())
+    @Query("UPDATE solicitudes SET conformidadCliente = :conforme, calificacionCliente = :calificacion, estado = 'CERRADA', fechaCierre = :ts, fechaActualizacion = :ts WHERE id = :solicitudId")
+    suspend fun confirmarCierre(solicitudId: Int, conforme: Boolean, calificacion: Int? = null, ts: Long = System.currentTimeMillis())
+
+    @Query("SELECT AVG(calificacionCliente) FROM solicitudes WHERE calificacionCliente IS NOT NULL")
+    fun promedioCalificacion(): Flow<Double?>
 
     @Query("UPDATE solicitudes SET motivoReapertura = :motivo, estado = 'EN_REVISION', fechaActualizacion = :ts WHERE id = :solicitudId")
     suspend fun solicitarReapertura(solicitudId: Int, motivo: String, ts: Long = System.currentTimeMillis())
 
     @Query("UPDATE solicitudes SET motivoCancelacion = :motivo, estado = 'CANCELADA', fechaActualizacion = :ts WHERE id = :solicitudId")
     suspend fun cancelarSolicitud(solicitudId: Int, motivo: String, ts: Long = System.currentTimeMillis())
-
-    // ---------- Relaciones para Compose ----------
-
-    @Transaction
-    @Query("SELECT * FROM solicitudes WHERE esBorrador = 0 ORDER BY fechaActualizacion DESC")
-    fun observarSolicitudesConParticipantes(): Flow<List<SolicitudConParticipantesDto>>
-
-    @Transaction
-    @Query("SELECT * FROM solicitudes WHERE id = :id")
-    fun observarSolicitudDetalleCompleto(id: Int): Flow<SolicitudDetalleCompletoDto?>
 }

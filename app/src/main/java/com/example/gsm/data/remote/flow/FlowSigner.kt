@@ -32,12 +32,6 @@ object FlowSigner {
         val hash = sha256Hmac.doFinal(data.toByteArray(Charsets.UTF_8))
 
         // Convertir bytes a cadena hexadecimal en minúsculas
-        val hexString = StringBuilder()
-        for (b in hash) {
-            val hex = Integer.toHexString(0xff and b.toInt())
-            if (hex.length == 1) hexString.append('0')
-            hexString.append(hex)
-        }
-        return hexString.toString()
+        return hash.joinToString("") { "%02x".format(it) }
     }
 }

@@ -1,5 +1,10 @@
 package com.example.gsm.ui.view.screens.auth
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -25,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.example.gsm.R
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.data.repository.UsuarioRepository
+import com.example.gsm.ui.view.components.shakeOnError
 import com.example.gsm.ui.view.screens.usuario.componentes.AppleBackground
 import com.example.gsm.ui.view.screens.usuario.componentes.TeamworkBlue
 import com.example.gsm.ui.viewmodel.AuthViewModel
@@ -38,6 +44,11 @@ fun CambiarPasswordObligatorioScreen(
     var confirmacion by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
+    var errorShakeTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(authVm.errorPasswordObligatoria) {
+        if (authVm.errorPasswordObligatoria != null) errorShakeTrigger++
+    }
 
     Column(
         modifier = Modifier
@@ -108,7 +119,9 @@ fun CambiarPasswordObligatorioScreen(
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = Color.White,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .shakeOnError(errorShakeTrigger)
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
@@ -120,11 +133,16 @@ fun CambiarPasswordObligatorioScreen(
                     fontWeight = FontWeight.SemiBold
                 )
 
+                val errorPassCorta = nuevaPassword.isNotEmpty() && nuevaPassword.trim().length < 4
+                val errorNoCoincide = confirmacion.isNotEmpty() && confirmacion.trim() != nuevaPassword.trim()
+
                 OutlinedTextField(
                     value = nuevaPassword,
                     onValueChange = { nuevaPassword = it },
                     label = { Text("Nueva contraseña") },
                     placeholder = { Text("Mínimo 4 caracteres") },
+                    isError = errorPassCorta,
+                    supportingText = if (errorPassCorta) { { Text("Debe tener al menos 4 caracteres") } } else null,
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -144,6 +162,8 @@ fun CambiarPasswordObligatorioScreen(
                     onValueChange = { confirmacion = it },
                     label = { Text("Confirmar nueva contraseña") },
                     placeholder = { Text("Reingresa la misma clave") },
+                    isError = errorNoCoincide,
+                    supportingText = if (errorNoCoincide) { { Text("Las contraseñas no coinciden") } } else null,
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -159,7 +179,11 @@ fun CambiarPasswordObligatorioScreen(
                 )
 
                 // Mensajes de error / validación
-                if (authVm.errorPasswordObligatoria != null) {
+                AnimatedVisibility(
+                    visible = authVm.errorPasswordObligatoria != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
                     Text(
                         text = authVm.errorPasswordObligatoria ?: "",
                         color = MaterialTheme.colorScheme.error,

@@ -42,6 +42,9 @@ interface UsuarioDao {
     @Query("UPDATE usuarios SET plan = :plan, ticketsDisponibles = :tickets, estadoSuscripcion = :estado, fechaActualizacion = :ts WHERE id = :id")
     suspend fun actualizarPlanSuscripcion(id: Int, plan: String, tickets: Int, estado: String, ts: Long = System.currentTimeMillis())
 
+    @Query("UPDATE usuarios SET ticketsDisponibles = ticketsDisponibles - 1 WHERE id = :id AND ticketsDisponibles > 0")
+    suspend fun descontarTicketDisponible(id: Int): Int
+
     @Query("DELETE FROM usuarios WHERE id = :id")
     suspend fun eliminarUsuario(id: Int)
 
@@ -55,6 +58,18 @@ interface UsuarioDao {
 
     @Query("SELECT * FROM usuarios WHERE rol = :rol AND activo = 1 ORDER BY nombre ASC")
     fun obtenerUsuariosPorRol(rol: String): Flow<List<UsuarioEntity>>
+
+    @Query("SELECT * FROM usuarios WHERE rol = 'CLIENTE' AND LOWER(TRIM(empresa)) = LOWER(TRIM(:empresa)) ORDER BY nombre ASC")
+    fun obtenerEquipoPorEmpresa(empresa: String): Flow<List<UsuarioEntity>>
+
+    @Query("SELECT id FROM usuarios WHERE rol = 'CLIENTE' AND LOWER(TRIM(empresa)) = LOWER(TRIM(:empresa))")
+    suspend fun obtenerIdsPorEmpresa(empresa: String): List<Int>
+
+    @Query("UPDATE usuarios SET plan = :plan, ticketsDisponibles = :tickets, estadoSuscripcion = :estado, fechaActualizacion = :ts WHERE rol = 'CLIENTE' AND LOWER(TRIM(empresa)) = LOWER(TRIM(:empresa))")
+    suspend fun actualizarPlanEmpresa(empresa: String, plan: String, tickets: Int, estado: String, ts: Long = System.currentTimeMillis())
+
+    @Query("UPDATE usuarios SET ticketsDisponibles = ticketsDisponibles - 1, fechaActualizacion = :ts WHERE rol = 'CLIENTE' AND LOWER(TRIM(empresa)) = LOWER(TRIM(:empresa)) AND ticketsDisponibles > 0")
+    suspend fun descontarTicketEmpresa(empresa: String, ts: Long = System.currentTimeMillis()): Int
 
     // Contadores requeridos en "Información de usuarios y perfiles" (PDF Pág. 8)
     @Query("SELECT COUNT(*) FROM solicitudes WHERE clienteId = :clienteId AND esBorrador = 0")

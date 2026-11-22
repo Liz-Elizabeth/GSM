@@ -50,6 +50,15 @@ class AdminDashboardViewModel(
     var porTecnico by mutableStateOf<List<ConteoPorTecnicoDto>>(emptyList())
         private set
 
+    var promedioCsat by mutableStateOf<Double?>(null)
+        private set
+
+    var totalRemoto by mutableStateOf<Long?>(null)
+        private set
+
+    var refrescando by mutableStateOf(false)
+        private set
+
     // Gestión de Usuarios y Roles (Fase 4 del Plan)
     var listaUsuarios by mutableStateOf<List<Usuario>>(emptyList())
         private set
@@ -85,6 +94,8 @@ class AdminDashboardViewModel(
         viewModelScope.launch { repo.metricasPorPrioridad(PrioridadSolicitud.URGENTE).collect { prioridadUrgente = it } }
 
         viewModelScope.launch { repo.metricasPorTecnico().collect { porTecnico = it } }
+        viewModelScope.launch { repo.metricasPromedioCsat().collect { promedioCsat = it } }
+        viewModelScope.launch { totalRemoto = repo.contarTotalTicketsRemotos() }
     }
 
     private fun cargarUsuarios() {
@@ -175,5 +186,19 @@ class AdminDashboardViewModel(
     fun limpiarMensajesUsuario() {
         mensajeUsuario = null
         errorUsuario = null
+    }
+
+    fun refrescarTotalRemoto() {
+        viewModelScope.launch {
+            refrescando = true
+            totalRemoto = repo.contarTotalTicketsRemotos()
+            refrescando = false
+        }
+    }
+
+    fun refrescarUsuariosDesdeNube() {
+        viewModelScope.launch {
+            usuarioRepo.sincronizarTodosUsuariosDesdeNube()
+        }
     }
 }

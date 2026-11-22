@@ -54,9 +54,9 @@ class HistorialRepository(
         esComentarioInterno: Boolean = false,
         evidenciaAdjunta: String? = null,
         fechaCambio: Long
-    ) {
-        kotlin.runCatching {
-            if (solicitudId <= 0) return
+    ): Boolean {
+        return kotlin.runCatching {
+            if (solicitudId <= 0) return false
             val duplicados = historialDao.contarMensajesDuplicados(solicitudId, fechaCambio, comentario.trim())
             if (duplicados == 0) {
                 historialDao.insertarHistorial(
@@ -73,10 +73,20 @@ class HistorialRepository(
                         fechaCambio = fechaCambio
                     )
                 )
+                true
+            } else {
+                false
             }
         }.onFailure { e ->
             android.util.Log.w("FirebaseSync", "Aviso seguro al guardar historial en Room: ${e.message}")
-        }
+        }.getOrDefault(false)
+    }
+
+    suspend fun obtenerPendientesSubida(): List<Historial> =
+        historialDao.obtenerPendientesSubida().map { it.toDomain() }
+
+    suspend fun actualizarEvidencia(id: Int, urlNube: String) {
+        historialDao.actualizarEvidencia(id, urlNube)
     }
 
     /**

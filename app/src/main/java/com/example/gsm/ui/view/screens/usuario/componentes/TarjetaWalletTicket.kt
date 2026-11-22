@@ -29,17 +29,6 @@ import com.example.gsm.data.model.Solicitud
 import com.example.gsm.ui.view.components.formatearFechaHora
 import com.example.gsm.util.QrCodeUtil
 
-private fun formatearEstado(estado: EstadoSolicitud): String = when (estado) {
-    EstadoSolicitud.RECIBIDA -> "Recibida"
-    EstadoSolicitud.EN_REVISION -> "En revisión"
-    EstadoSolicitud.ASIGNADA -> "Asignada"
-    EstadoSolicitud.EN_PROCESO -> "En proceso"
-    EstadoSolicitud.PENDIENTE_INFORMACION -> "Pendiente info"
-    EstadoSolicitud.RESUELTA -> "Resuelta"
-    EstadoSolicitud.CERRADA -> "Cerrada"
-    EstadoSolicitud.CANCELADA -> "Cancelada"
-}
-
 /**
  * Pase de Servicio Digital Enterprise (GSM Enterprise Service Pass).
  * Diseñado con estética corporativa de alta gama:
@@ -51,13 +40,14 @@ private fun formatearEstado(estado: EstadoSolicitud): String = when (estado) {
 @Composable
 fun TarjetaWalletTicket(
     solicitud: Solicitud,
-    alVerDetalle: () -> Unit
+    alVerDetalle: () -> Unit,
+    inicialAbierto: Boolean = false
 ) {
     val context = LocalContext.current
-    var abierto by remember { mutableStateOf(false) }
+    var abierto by remember(solicitud.id) { mutableStateOf(inicialAbierto) }
 
-    val qrBitmap = remember(solicitud.codigoSeguimiento) {
-        QrCodeUtil.generarQrBitmap(solicitud.codigoSeguimiento, 480, 480)
+    val qrBitmap = remember(solicitud.codigoSeguimiento, abierto) {
+        if (abierto) QrCodeUtil.generarQrBitmap(solicitud.codigoSeguimiento, 480, 480) else null
     }
 
     val ahora = System.currentTimeMillis()

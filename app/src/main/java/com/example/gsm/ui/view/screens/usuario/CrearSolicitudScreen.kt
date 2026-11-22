@@ -7,7 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -16,43 +16,39 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
 import com.example.gsm.data.model.CategoriaSolicitud
+import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.ui.view.components.DatosEvidenciaVisualizar
 import com.example.gsm.ui.view.components.EncabezadoPantalla
+import com.example.gsm.ui.view.components.PantallaExitoCompleta
 import com.example.gsm.ui.view.components.VisorEvidenciaModal
+import com.example.gsm.ui.view.components.shakeOnError
+import com.example.gsm.ui.view.screens.usuario.componentes.AppleBackground
+import com.example.gsm.ui.view.screens.usuario.componentes.SeccionTitulo
+import com.example.gsm.ui.view.screens.usuario.componentes.TeamworkBlue
 import com.example.gsm.ui.viewmodel.SolicitudViewModel
 import com.example.gsm.util.ArchivoAdjunto
 import com.example.gsm.util.FileUtil
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 
-// Paleta Apple + Teamwork Desk
-private val AppleBackground = Color(0xFFF2F2F7)
-private val TeamworkBlue = Color(0xFF0066FF)
-
-@Composable
-private fun SeccionTitulo(texto: String) {
-    Text(
-        text = texto.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-    )
-}
+private const val MAX_EVIDENCIAS_TICKET = 5
 
 @Composable
 private fun campoTextoColores() = OutlinedTextFieldDefaults.colors(
@@ -65,24 +61,9 @@ private fun campoTextoColores() = OutlinedTextFieldDefaults.colors(
 )
 
 /**
- * Obtiene un emoji descriptivo según la categoría para mejorar la lectura visual.
- */
-private fun iconoParaCategoria(cat: CategoriaSolicitud): String = when (cat) {
-    CategoriaSolicitud.INCIDENTE_TECNICO -> "🚨"
-    CategoriaSolicitud.DESARROLLO_WEB -> "💻"
-    CategoriaSolicitud.MANTENIMIENTO_WEB -> "🛠️"
-    CategoriaSolicitud.HOSTING -> "☁️"
-    CategoriaSolicitud.SOPORTE_CORREO -> "✉️"
-    CategoriaSolicitud.MARKETING_DIGITAL -> "📈"
-    CategoriaSolicitud.SOLICITUD_CAMBIO -> "🔄"
-    CategoriaSolicitud.CONSULTA -> "❓"
-    CategoriaSolicitud.ACCESO_CONFIGURACION -> "🔑"
-    CategoriaSolicitud.OTRO -> "📋"
-}
-
-/**
- * Pantalla para Crear Nueva Solicitud (Patrón KISS y diseño moderno Apple HIG).
- * Rediseñada para máxima claridad, campos bien definidos y captura de fotos nativa.
+ * Pantalla para Crear Nueva Solicitud.
+ * Permite adjuntar múltiples evidencias (cámara y selector múltiple) y mantiene
+ * los botones de acción fijos en la parte inferior para enviar sin hacer scroll extra.
  */
 @Composable
 fun CrearSolicitudScreen(
@@ -91,44 +72,70 @@ fun CrearSolicitudScreen(
     alVolver: () -> Unit
 ) {
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
 
     var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
     var intentoEnvio by remember { mutableStateOf(false) }
+    var errorShakeTrigger by remember { mutableIntStateOf(0) }
+    var mostrarExitoCreacion by remember { mutableStateOf(false) }
+
+    LaunchedEffect(mostrarExitoCreacion) {
+        if (mostrarExitoCreacion) {
+            delay(1150)
+            alVolver()
+        }
+    }
     var categoriaSeleccionada by remember { mutableStateOf(CategoriaSolicitud.INCIDENTE_TECNICO) }
     var servicio by remember { mutableStateOf("") }
     var activo by remember { mutableStateOf("") }
-    var archivoSeleccionado by remember { mutableStateOf<ArchivoAdjunto?>(null) }
-    var verEvidenciaModal by remember { mutableStateOf(false) }
+    var contextoExpandido by remember { mutableStateOf(false) }
 
-    // Estado y archivos para la Cámara Nativa
-    var archivoFotoCamara by remember { mutableStateOf<File?>(null) }
+    // Lista de múltiples evidencias; se evita duplicar por uriString
+    var archivosSeleccionados by remember { mutableStateOf<List<ArchivoAdjunto>>(emptyList()) }
+    var evidenciaAVisualizar by remember { mutableStateOf<ArchivoAdjunto?>(null) }
 
-    // Launcher de Cámara para captura de evidencias reales (sin demos)
+    // Se persiste la ruta con rememberSaveable por si Android destruye la Activity al volver de la cámara
+    var rutaFotoCamara by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun agregarAdjuntos(nuevos: List<ArchivoAdjunto>) {
+        if (nuevos.isEmpty()) return
+        val combinados = (archivosSeleccionados + nuevos)
+            .distinctBy { it.uriString }
+            .take(MAX_EVIDENCIAS_TICKET)
+        if (archivosSeleccionados.size + nuevos.size > MAX_EVIDENCIAS_TICKET) {
+            Toast.makeText(context, "Máximo $MAX_EVIDENCIAS_TICKET evidencias por ticket", Toast.LENGTH_SHORT).show()
+        }
+        archivosSeleccionados = combinados
+    }
+
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { exito ->
-        if (exito && archivoFotoCamara != null) {
-            val file = archivoFotoCamara!!
-            archivoSeleccionado = ArchivoAdjunto(
-                nombre = file.name,
-                tipoMime = "image/jpeg",
-                tamanoBytes = file.length(),
-                uriString = Uri.fromFile(file).toString()
-            )
+        val ruta = rutaFotoCamara
+        if (exito && ruta != null) {
+            val file = File(ruta)
+            if (file.exists() && file.length() > 0L) {
+                agregarAdjuntos(
+                    listOf(
+                        ArchivoAdjunto(
+                            nombre = file.name,
+                            tipoMime = "image/jpeg",
+                            tamanoBytes = file.length(),
+                            uriString = Uri.fromFile(file).toString()
+                        )
+                    )
+                )
+            }
         }
+        rutaFotoCamara = null
     }
 
     fun ejecutarCapturaCamara() {
         try {
-            val dir = File(context.filesDir, "evidencias").apply { if (!exists()) mkdirs() }
-            val photoFile = File(dir, "EVIDENCIA_${System.currentTimeMillis()}.jpg")
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                photoFile
-            )
-            archivoFotoCamara = photoFile
+            val (photoFile, uri) = FileUtil.crearArchivoFotoTemporal(context, "EVIDENCIA")
+            rutaFotoCamara = photoFile.absolutePath
             cameraLauncher.launch(uri)
         } catch (e: Exception) {
             Log.e("CrearSolicitudScreen", "Error abriendo cámara: ${e.message}", e)
@@ -139,35 +146,30 @@ fun CrearSolicitudScreen(
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { concedido ->
-        if (concedido) {
-            ejecutarCapturaCamara()
-        } else {
-            Toast.makeText(context, "Se requiere permiso de cámara para capturar fotos", Toast.LENGTH_SHORT).show()
-        }
+        if (concedido) ejecutarCapturaCamara()
+        else Toast.makeText(context, "Se requiere permiso de cámara para capturar fotos", Toast.LENGTH_SHORT).show()
     }
 
     fun tomarFotoConCamara() {
         val permiso = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-        if (permiso == PackageManager.PERMISSION_GRANTED) {
-            ejecutarCapturaCamara()
-        } else {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
+        if (permiso == PackageManager.PERMISSION_GRANTED) ejecutarCapturaCamara()
+        else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    // Launcher para elegir archivos del dispositivo
+    // GetMultipleContents permite elegir varios archivos/fotos en una sola apertura del selector
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            archivoSeleccionado = FileUtil.obtenerDatosDeUri(context, uri)
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val adjuntos = uris.map { FileUtil.obtenerDatosDeUri(context, it) }
+            agregarAdjuntos(adjuntos)
         }
     }
 
     val camposValidos = titulo.isNotBlank() && descripcion.isNotBlank()
 
-    // Función única para procesamiento seguro (KISS)
-    fun procesarEnvio(esBorrador: Boolean) {
+    fun procesarEnvio() {
+        val primera = archivosSeleccionados.firstOrNull()
         solicitudVm.crearSolicitud(
             titulo = titulo,
             descripcion = descripcion,
@@ -175,116 +177,86 @@ fun CrearSolicitudScreen(
             cliente = cliente,
             servicio = servicio.ifBlank { null },
             activo = activo.ifBlank { null },
-            nombreEvidencia = archivoSeleccionado?.nombre,
-            tipoEvidencia = archivoSeleccionado?.tipoMime,
-            tamanoEvidencia = archivoSeleccionado?.tamanoBytes,
-            uriEvidencia = archivoSeleccionado?.uriString,
-            esBorrador = esBorrador,
-            alCrearConExito = alVolver
+            nombreEvidencia = primera?.nombre,
+            tipoEvidencia = primera?.tipoMime,
+            tamanoEvidencia = primera?.tamanoBytes,
+            uriEvidencia = primera?.uriString,
+            evidencias = archivosSeleccionados,
+            esBorrador = false,
+            alCrearConExito = { mostrarExitoCreacion = true }
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppleBackground)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        // 1. Barra Superior
-        EncabezadoPantalla(
-            titulo = "Nuevo Ticket",
-            textoBotonDerecho = "Cancelar",
-            alHacerClicDerecho = alVolver
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 2. Tarjeta Hero informativa del Solicitante
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            modifier = Modifier.fillMaxWidth()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(AppleBackground)
         ) {
-            Row(
+            // Contenido desplazable; el footer de acciones queda fijo abajo
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+            EncabezadoPantalla(
+                titulo = "Nuevo Ticket",
+                textoBotonDerecho = "Cancelar",
+                alHacerClicDerecho = alVolver
+            )
+
+            // Subtítulo compacto con organización y cuota disponible (evita tarjeta introductoria duplicada)
+            val resumenSolicitante = buildString {
+                append(cliente.nombre)
+                if (!cliente.empresa.isNullOrBlank()) append(" · ${cliente.empresa}")
+                if (cliente.rol == RolUsuario.CLIENTE) append(" · ${cliente.ticketsDisponibles} disponibles")
+            }
+            Text(
+                text = resumenSolicitante,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF636366),
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 14.dp)
+            )
+
+            // 1. DETALLE PRINCIPAL
+            SeccionTitulo("Detalle del requerimiento")
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    .shakeOnError(errorShakeTrigger)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = TeamworkBlue.copy(alpha = 0.12f),
-                    modifier = Modifier.size(46.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.Assignment,
-                            contentDescription = null,
-                            tint = TeamworkBlue,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Crear Solicitud de Soporte",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1C1C1E)
+                    OutlinedTextField(
+                        value = titulo,
+                        onValueChange = { titulo = it },
+                        label = { Text("Asunto o título corto *") },
+                        placeholder = { Text("Ej: Error 500 al ingresar al sistema") },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Title, contentDescription = null, tint = TeamworkBlue, modifier = Modifier.size(20.dp))
+                        },
+                        isError = intentoEnvio && titulo.isBlank(),
+                        supportingText = {
+                            if (intentoEnvio && titulo.isBlank()) {
+                                Text("El asunto o título es obligatorio", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = campoTextoColores(),
+                        modifier = Modifier.fillMaxWidth()
                     )
+
                     Text(
-                        text = "Solicitante: ${cliente.nombre}${if (!cliente.empresa.isNullOrBlank()) " (${cliente.empresa})" else ""}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF8E8E93)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 3. BLOQUE PRINCIPAL: INFORMACIÓN REQUERIDA
-        SeccionTitulo("1. Detalle del Requerimiento *")
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Campo Título
-                OutlinedTextField(
-                    value = titulo,
-                    onValueChange = { titulo = it },
-                    label = { Text("Asunto o título corto *") },
-                    placeholder = { Text("Ej: Error 500 al ingresar al sistema") },
-                    leadingIcon = {
-                        Icon(Icons.Filled.Title, contentDescription = null, tint = TeamworkBlue, modifier = Modifier.size(20.dp))
-                    },
-                    isError = intentoEnvio && titulo.isBlank(),
-                    supportingText = {
-                        if (intentoEnvio && titulo.isBlank()) {
-                            Text("El asunto o título es obligatorio", color = MaterialTheme.colorScheme.error)
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = campoTextoColores(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Selector de Categoría
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Tipo de Requerimiento:",
+                        text = "Categoría",
                         style = MaterialTheme.typography.labelMedium,
                         color = Color(0xFF636366),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 2.dp)
+                        fontWeight = FontWeight.SemiBold
                     )
                     Row(
                         modifier = Modifier
@@ -293,325 +265,295 @@ fun CrearSolicitudScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         CategoriaSolicitud.entries.forEach { cat ->
-                            val seleccionada = categoriaSeleccionada == cat
-                            Surface(
+                            FilterChip(
+                                selected = categoriaSeleccionada == cat,
                                 onClick = { categoriaSeleccionada = cat },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (seleccionada) TeamworkBlue.copy(alpha = 0.10f) else Color(0xFFF9F9FB),
-                                border = BorderStroke(
-                                    width = if (seleccionada) 1.5.dp else 1.dp,
-                                    color = if (seleccionada) TeamworkBlue else Color(0xFFE5E5EA)
-                                ),
-                                modifier = Modifier.height(40.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.padding(horizontal = 12.dp)
-                                ) {
-                                    Text(text = iconoParaCategoria(cat), fontSize = 14.sp)
-                                    Text(
-                                        text = cat.descripcion,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (seleccionada) TeamworkBlue else Color(0xFF1C1C1E)
-                                    )
-                                    if (seleccionada) {
-                                        Icon(
-                                            Icons.Filled.Check,
-                                            contentDescription = null,
-                                            tint = TeamworkBlue,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Campo Descripción
-                OutlinedTextField(
-                    value = descripcion,
-                    onValueChange = { descripcion = it },
-                    label = { Text("Descripción del problema o solicitud *") },
-                    placeholder = { Text("Indica detalladamente qué ocurre, mensajes observados o qué necesitas resolver...") },
-                    isError = intentoEnvio && descripcion.isBlank(),
-                    supportingText = {
-                        if (intentoEnvio && descripcion.isBlank()) {
-                            Text("Describe detalladamente el problema o requerimiento", color = MaterialTheme.colorScheme.error)
-                        }
-                    },
-                    minLines = 4,
-                    maxLines = 8,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = campoTextoColores(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 4. BLOQUE SECUNDARIO: CONTEXTO DEL SERVICIO (OPCIONAL)
-        SeccionTitulo("2. Contexto Técnico (Opcional)")
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                OutlinedTextField(
-                    value = servicio,
-                    onValueChange = { servicio = it },
-                    label = { Text("Servicio afectado (Opcional)") },
-                    placeholder = { Text("Ej: Hosting Pyme, Correo Corporativo") },
-                    leadingIcon = {
-                        Icon(Icons.Filled.Build, contentDescription = null, tint = Color(0xFF8E8E93), modifier = Modifier.size(20.dp))
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = campoTextoColores(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = activo,
-                    onValueChange = { activo = it },
-                    label = { Text("Activo o sitio web relacionado (Opcional)") },
-                    placeholder = { Text("Ej: www.miempresa.cl o Servidor VPS") },
-                    leadingIcon = {
-                        Icon(Icons.Filled.Language, contentDescription = null, tint = Color(0xFF8E8E93), modifier = Modifier.size(20.dp))
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = campoTextoColores(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 5. BLOQUE DE EVIDENCIA ADJUNTA (CÁMARA REAL Y ARCHIVO)
-        SeccionTitulo("3. Evidencia o Fotografía")
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Adjunta una captura o fotografía para acelerar la resolución:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF636366)
-                )
-
-                if (archivoSeleccionado != null) {
-                    val archivo = archivoSeleccionado!!
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = TeamworkBlue.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, TeamworkBlue.copy(alpha = 0.25f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color.White,
-                                    modifier = Modifier.size(38.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = FileUtil.obtenerIconoVectorSegunMime(archivo.tipoMime),
-                                            contentDescription = null,
-                                            tint = TeamworkBlue,
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                    }
-                                }
-                                Column {
-                                    Text(
-                                        text = archivo.nombre,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1C1C1E),
-                                        maxLines = 1
-                                    )
-                                    Text(
-                                        text = "${FileUtil.formatearTamano(archivo.tamanoBytes)} • Adjunto listo",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF8E8E93)
-                                    )
-                                }
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                TextButton(
-                                    onClick = { verEvidenciaModal = true },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Icon(Icons.Filled.Visibility, contentDescription = "Ver", modifier = Modifier.size(18.dp), tint = TeamworkBlue)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Ver", fontWeight = FontWeight.Bold, color = TeamworkBlue)
-                                }
-                                IconButton(
-                                    onClick = { archivoSeleccionado = null },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Botón de Cámara Real (FileProvider)
-                        FilledTonalButton(
-                            onClick = { tomarFotoConCamara() },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = TeamworkBlue.copy(alpha = 0.10f),
-                                contentColor = TeamworkBlue
+                                label = { Text(cat.descripcion) }
                             )
-                        ) {
-                            Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Cámara", fontWeight = FontWeight.Bold)
                         }
+                    }
 
-                        // Botón de Selector de Archivos del Dispositivo
-                        OutlinedButton(
-                            onClick = { filePickerLauncher.launch("*/*") },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp),
-                            border = BorderStroke(1.dp, Color(0xFFE5E5EA))
-                        ) {
-                            Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Archivo", fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(
+                        value = descripcion,
+                        onValueChange = { descripcion = it },
+                        label = { Text("Descripción del problema *") },
+                        placeholder = { Text("Indica qué ocurre, mensajes observados o qué necesitas resolver...") },
+                        isError = intentoEnvio && descripcion.isBlank(),
+                        supportingText = {
+                            if (intentoEnvio && descripcion.isBlank()) {
+                                Text("Describe detalladamente el problema o requerimiento", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        minLines = 4,
+                        maxLines = 8,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = campoTextoColores(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Contexto técnico opcional colapsado por defecto para mantener limpia la vista inicial
+                    TextButton(
+                        onClick = { contextoExpandido = !contextoExpandido },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (contextoExpandido) Icons.Filled.ExpandLess else Icons.Filled.Add,
+                            contentDescription = null,
+                            tint = TeamworkBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (contextoExpandido) "Ocultar servicio / activo" else "Agregar servicio o activo (opcional)",
+                            color = TeamworkBlue,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    AnimatedVisibility(visible = contextoExpandido) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(
+                                value = servicio,
+                                onValueChange = { servicio = it },
+                                label = { Text("Servicio afectado") },
+                                placeholder = { Text("Ej: Hosting Pyme, Correo Corporativo") },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.Build, contentDescription = null, tint = Color(0xFF8E8E93), modifier = Modifier.size(20.dp))
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = campoTextoColores(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = activo,
+                                onValueChange = { activo = it },
+                                label = { Text("Activo o sitio web") },
+                                placeholder = { Text("Ej: www.miempresa.cl o Servidor VPS") },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.Language, contentDescription = null, tint = Color(0xFF8E8E93), modifier = Modifier.size(20.dp))
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = campoTextoColores(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }
             }
-        }
 
-        // Feedback / Mensajes del ViewModel
-        if (solicitudVm.mensaje != null) {
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. EVIDENCIAS MÚLTIPLES (CÁMARA Y SELECTOR MÚLTIPLE SIEMPRE DISPONIBLES HASTA EL LÍMITE)
+            SeccionTitulo("Evidencias (${archivosSeleccionados.size}/$MAX_EVIDENCIAS_TICKET)")
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = TeamworkBlue.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "ℹ️ ${solicitudVm.mensaje}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TeamworkBlue,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(14.dp)
-                )
-            }
-        }
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (archivosSeleccionados.size < MAX_EVIDENCIAS_TICKET) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            FilledTonalButton(
+                                onClick = { tomarFotoConCamara() },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = TeamworkBlue.copy(alpha = 0.10f),
+                                    contentColor = TeamworkBlue
+                                )
+                            ) {
+                                Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Cámara", fontWeight = FontWeight.Bold)
+                            }
 
-        Spacer(modifier = Modifier.height(22.dp))
-
-        // 6. BARRA DE ACCIÓN INFERIOR (Borrador vs Enviar Solicitud)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = { procesarEnvio(esBorrador = true) },
-                enabled = titulo.isNotBlank(),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, if (titulo.isNotBlank()) TeamworkBlue else Color(0xFFE5E5EA)),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp)
-            ) {
-                Icon(Icons.Filled.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Borrador", fontWeight = FontWeight.Bold)
-            }
-
-            Button(
-                onClick = {
-                    if (camposValidos) {
-                        procesarEnvio(esBorrador = false)
-                    } else {
-                        intentoEnvio = true
+                            OutlinedButton(
+                                onClick = { filePickerLauncher.launch("*/*") },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                border = BorderStroke(1.dp, Color(0xFFE5E5EA))
+                            ) {
+                                Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Archivos", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (camposValidos) TeamworkBlue else Color(0xFF64748B)
-                ),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1.3f)
-                    .height(52.dp)
-            ) {
-                Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Enviar Ticket", fontWeight = FontWeight.Bold)
+
+                    if (archivosSeleccionados.isEmpty()) {
+                        Text(
+                            text = "Opcional: adjunta fotos o documentos para acelerar la resolución.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF8E8E93)
+                        )
+                    } else {
+                        archivosSeleccionados.forEach { archivo ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = TeamworkBlue.copy(alpha = 0.06f),
+                                border = BorderStroke(1.dp, TeamworkBlue.copy(alpha = 0.22f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(shape = CircleShape, color = Color.White, modifier = Modifier.size(34.dp)) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = FileUtil.obtenerIconoVectorSegunMime(archivo.tipoMime),
+                                                    contentDescription = null,
+                                                    tint = TeamworkBlue,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                        Column {
+                                            Text(
+                                                text = archivo.nombre,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF1C1C1E),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = FileUtil.formatearTamano(archivo.tamanoBytes),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF8E8E93)
+                                            )
+                                        }
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = { evidenciaAVisualizar = archivo },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Visibility, contentDescription = "Ver", tint = TeamworkBlue, modifier = Modifier.size(18.dp))
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                archivosSeleccionados = archivosSeleccionados.filterNot { it.uriString == archivo.uriString }
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Close, contentDescription = "Quitar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (solicitudVm.mensaje != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = TeamworkBlue.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = solicitudVm.mensaje ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TeamworkBlue,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // 3. BARRA FIJA INFERIOR (Enviar Ticket)
+        val enviando = solicitudVm.cargando
+        Surface(
+            color = Color.White,
+            shadowElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (camposValidos) {
+                            procesarEnvio()
+                        } else {
+                            intentoEnvio = true
+                            errorShakeTrigger++
+                            coroutineScope.launch { scrollState.animateScrollTo(0) }
+                        }
+                    },
+                    enabled = !enviando && !mostrarExitoCreacion,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (camposValidos) TeamworkBlue else Color(0xFF64748B)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    if (enviando) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Enviando...", fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Enviar Ticket", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        }
 
-        Text(
-            text = "🔒 Tu solicitud se sincronizará de inmediato con el equipo de soporte.",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF8E8E93),
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
+        if (mostrarExitoCreacion) {
+            val codigo = solicitudVm.mensaje?.substringAfter(": ")?.trim()
+            PantallaExitoCompleta(
+                titulo = "¡Ticket enviado!",
+                subtitulo = codigo?.let { "Código #$it" } ?: "Registrado en mesa de ayuda"
+            )
+        }
     }
 
-    // Modal para Visualizar Evidencias In-App antes de enviar
-    if (verEvidenciaModal && archivoSeleccionado != null) {
-        val arch = archivoSeleccionado!!
+    if (evidenciaAVisualizar != null) {
+        val arch = evidenciaAVisualizar!!
         VisorEvidenciaModal(
             evidencia = DatosEvidenciaVisualizar(
                 nombreArchivo = arch.nombre,
                 tipoArchivo = arch.tipoMime,
                 tamanoBytes = arch.tamanoBytes,
-                uriString = arch.uriString,
-                estadoRevision = "PENDIENTE"
+                uriString = arch.uriString
             ),
-            onDismiss = { verEvidenciaModal = false }
+            onDismiss = { evidenciaAVisualizar = null }
         )
     }
 }

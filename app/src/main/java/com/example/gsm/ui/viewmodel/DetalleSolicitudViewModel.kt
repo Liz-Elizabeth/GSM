@@ -34,12 +34,6 @@ class DetalleSolicitudViewModel(
     var tecnicosDisponibles by mutableStateOf<List<Usuario>>(emptyList())
         private set
 
-    var mensajeWhatsApp by mutableStateOf("")
-        private set
-
-    var enviandoWhatsApp by mutableStateOf(false)
-        private set
-
     var mensaje by mutableStateOf<String?>(null)
         private set
 
@@ -68,7 +62,6 @@ class DetalleSolicitudViewModel(
             val encontrada = repo.obtenerPorId(solicitudId)
             solicitud = encontrada
             if (encontrada != null) {
-                mensajeWhatsApp = repo.formatearMensajeWhatsApp(encontrada)
                 if (encontrada.codigoSeguimiento.isNotBlank()) {
                     repo.iniciarSincronizacionHistorial(
                         codigoSeguimiento = encontrada.codigoSeguimiento,
@@ -125,10 +118,21 @@ class DetalleSolicitudViewModel(
         solicitudId: Int,
         nuevoTitulo: String,
         nuevaDescripcion: String,
-        usuario: Usuario
+        usuario: Usuario,
+        nuevaCategoria: CategoriaSolicitud? = null,
+        nuevoServicio: String? = null,
+        nuevoActivo: String? = null
     ) {
         viewModelScope.launch {
-            val res = repo.actualizarInformacionSolicitud(solicitudId, nuevoTitulo, nuevaDescripcion, usuario)
+            val res = repo.actualizarInformacionSolicitud(
+                solicitudId = solicitudId,
+                nuevoTitulo = nuevoTitulo,
+                nuevaDescripcion = nuevaDescripcion,
+                usuario = usuario,
+                nuevaCategoria = nuevaCategoria,
+                nuevoServicio = nuevoServicio,
+                nuevoActivo = nuevoActivo
+            )
             if (res.isSuccess) {
                 mensaje = "Solicitud actualizada correctamente."
                 cargarDetalle(solicitudId, usuario.rol)
@@ -250,27 +254,15 @@ class DetalleSolicitudViewModel(
         }
     }
 
-    fun confirmarCierre(solicitudId: Int, usuario: Usuario, conforme: Boolean) {
+    fun confirmarCierre(solicitudId: Int, usuario: Usuario, conforme: Boolean, calificacion: Int? = null) {
         ejecutarCambio(solicitudId, usuario.rol, "Solicitud cerrada con conformidad") {
-            repo.confirmarCierre(solicitudId, usuario, conforme)
+            repo.confirmarCierre(solicitudId, usuario, conforme, calificacion)
         }
     }
 
     fun solicitarReapertura(solicitudId: Int, cliente: Usuario, motivo: String) {
         ejecutarCambio(solicitudId, cliente.rol, "Solicitud reabierta (En Revisión)") {
             repo.solicitarReapertura(solicitudId, cliente, motivo)
-        }
-    }
-
-    // --- BOTÓN DE WHATSAPP ---
-
-    fun simularEnvioWhatsApp() {
-        val sol = solicitud ?: return
-        viewModelScope.launch {
-            enviandoWhatsApp = true
-            repo.simularEnvioWhatsApp(sol)
-            enviandoWhatsApp = false
-            mensaje = "Mensaje enviado a WhatsApp (${sol.codigoSeguimiento})"
         }
     }
 

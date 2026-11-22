@@ -24,10 +24,10 @@ import com.example.gsm.data.model.Solicitud
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.ui.view.components.EncabezadoPantalla
 import com.example.gsm.ui.view.components.formatearFechaHora
+import com.example.gsm.ui.view.screens.usuario.componentes.AppleBackground
+import com.example.gsm.ui.view.screens.usuario.componentes.EstadoVacioCard
+import com.example.gsm.ui.view.screens.usuario.componentes.TeamworkBlue
 import com.example.gsm.ui.viewmodel.SolicitudViewModel
-
-private val AppleBackground = Color(0xFFF2F2F7)
-private val TeamworkBlue = Color(0xFF0066FF)
 
 /**
  * Pantalla de Archivo de Tickets (KISS).
@@ -42,8 +42,23 @@ fun ArchivoTicketsScreen(
     alVolver: () -> Unit,
     alIrADetalle: (Int) -> Unit
 ) {
-    val archivadas = remember(solicitudVm.listaSolicitudes) {
-        solicitudVm.solicitudesArchivadas
+    var textoBusqueda by remember { mutableStateOf("") }
+    var filtroEstado by remember { mutableStateOf<EstadoSolicitud?>(null) }
+
+    LaunchedEffect(Unit) {
+        solicitudVm.sincronizarArchivoCompleto()
+    }
+
+    // Se recalcula solo cuando cambia la lista fuente, el chip de estado o la búsqueda local
+    val archivadas = remember(solicitudVm.listaSolicitudes, textoBusqueda, filtroEstado) {
+        val base = solicitudVm.solicitudesArchivadas
+        val porEstado = if (filtroEstado == null) base else base.filter { it.estado == filtroEstado }
+        val query = textoBusqueda.trim().lowercase()
+        if (query.isEmpty()) porEstado
+        else porEstado.filter {
+            it.codigoSeguimiento.lowercase().contains(query) ||
+                it.titulo.lowercase().contains(query)
+        }
     }
 
     Column(
@@ -103,54 +118,61 @@ fun ArchivoTicketsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // 3. Lista de tickets archivados o estado vacío
-        if (archivadas.isEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = AppleBackground,
-                        modifier = Modifier.size(64.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.Inventory2,
-                                contentDescription = null,
-                                tint = Color(0xFF8E8E93),
-                                modifier = Modifier.size(32.dp)
-                            )
+        if (solicitudVm.solicitudesArchivadas.isNotEmpty()) {
+            OutlinedTextField(
+                value = textoBusqueda,
+                onValueChange = { textoBusqueda = it },
+                placeholder = { Text("Buscar por código o título...") },
+                leadingIcon = {
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = TeamworkBlue)
+                },
+                trailingIcon = {
+                    if (textoBusqueda.isNotEmpty()) {
+                        IconButton(onClick = { textoBusqueda = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Limpiar búsqueda")
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Sin tickets archivados",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1C1C1E)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Los tickets que cierres o que sean cancelados aparecerán en este archivo de respaldo.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF8E8E93),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = TeamworkBlue,
+                    unfocusedBorderColor = Color(0xFFE5E5EA)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val opcionesFiltro = listOf(
+                    null to "Todas",
+                    EstadoSolicitud.CERRADA to "Cerradas",
+                    EstadoSolicitud.CANCELADA to "Canceladas"
+                )
+                opcionesFiltro.forEach { (estado, etiqueta) ->
+                    FilterChip(
+                        selected = filtroEstado == estado,
+                        onClick = { filtroEstado = estado },
+                        label = { Text(etiqueta) }
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // 3. Lista de tickets archivados o estado vacío
+        if (archivadas.isEmpty()) {
+            EstadoVacioCard(
+                icono = Icons.Filled.Inventory2,
+                titulo = if (textoBusqueda.isNotBlank() || filtroEstado != null) "Sin coincidencias" else "Sin tickets archivados",
+                subtitulo = "Los tickets que cierres o que sean cancelados aparecerán en este archivo de respaldo.",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),

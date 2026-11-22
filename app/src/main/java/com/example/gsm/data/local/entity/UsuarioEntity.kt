@@ -18,6 +18,7 @@ data class UsuarioEntity(
     val password: String, // Simulación de login académico por perfiles
     val rol: String, // CLIENTE, ADMINISTRADOR, TECNICO
     val empresa: String? = null,
+
     val telefono: String? = null,
     // --- CAMPOS NUEVOS EXIGIDOS POR PDF PÁG. 8 ---
     val medioContacto: String? = "WhatsApp", // Canal de comunicación preferente de prueba

@@ -3,12 +3,15 @@ package com.example.gsm.ui.view.screens.usuario
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
@@ -24,10 +27,17 @@ import com.example.gsm.data.model.EstadoSolicitud
 import com.example.gsm.data.model.Solicitud
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.ui.view.components.formatearFechaHora
+import com.example.gsm.ui.view.screens.usuario.componentes.AlertRedBg
+import com.example.gsm.ui.view.screens.usuario.componentes.AlertRedText
+import com.example.gsm.ui.view.screens.usuario.componentes.AppleBackground
+import com.example.gsm.ui.view.screens.usuario.componentes.EstadoVacioCard
+import com.example.gsm.ui.view.screens.usuario.componentes.SuccessGreenBg
+import com.example.gsm.ui.view.screens.usuario.componentes.SuccessGreenText
+import com.example.gsm.ui.view.screens.usuario.componentes.TeamworkBlue
+import com.example.gsm.ui.view.screens.usuario.componentes.formatearEstado
 import com.example.gsm.ui.viewmodel.SolicitudViewModel
 
-private val AppleBackground = Color(0xFFF2F2F7)
-private val TeamworkBlue = Color(0xFF0066FF)
+private enum class FiltroMensajes { TODAS, ESPERANDO_RESPUESTA, SIN_ASIGNAR }
 
 /**
  * Centro de Mensajes y Chats Directos de Tickets (KISS).
@@ -37,6 +47,7 @@ private val TeamworkBlue = Color(0xFF0066FF)
  * - Acceso en 1 toque al chat en vivo sin pasar por pantallas intermedias.
  * - Sincronizado en tiempo real con Firestore y SQLite local.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BandejaMensajesScreen(
     usuario: Usuario,
@@ -45,13 +56,27 @@ fun BandejaMensajesScreen(
     alIrACrear: () -> Unit
 ) {
     var textoFiltro by remember { mutableStateOf("") }
+    var filtroRapido by remember { mutableStateOf(FiltroMensajes.TODAS) }
 
-    val ticketsConversacion = remember(solicitudVm.listaSolicitudes, textoFiltro) {
-        solicitudVm.solicitudesActivas.filter { sol ->
-            textoFiltro.isBlank() ||
-            sol.codigoSeguimiento.contains(textoFiltro, ignoreCase = true) ||
-            sol.titulo.contains(textoFiltro, ignoreCase = true)
-        }
+    // Se parte de solicitudesActivas para no mezclar tickets cerrados/cancelados en el buzón vivo,
+    // y se ordena por actividad reciente para mostrar primero las conversaciones con movimiento.
+    val ticketsConversacion = remember(solicitudVm.listaSolicitudes, textoFiltro, filtroRapido) {
+        solicitudVm.solicitudesActivas
+            .asSequence()
+            .filter { sol ->
+                when (filtroRapido) {
+                    FiltroMensajes.TODAS -> true
+                    FiltroMensajes.ESPERANDO_RESPUESTA -> sol.estado == EstadoSolicitud.PENDIENTE_INFORMACION
+                    FiltroMensajes.SIN_ASIGNAR -> sol.tecnicoId == null
+                }
+            }
+            .filter { sol ->
+                textoFiltro.isBlank() ||
+                    sol.codigoSeguimiento.contains(textoFiltro, ignoreCase = true) ||
+                    sol.titulo.contains(textoFiltro, ignoreCase = true)
+            }
+            .sortedByDescending { maxOf(it.fechaActualizacion, it.fechaCreacion) }
+            .toList()
     }
 
     Column(
@@ -135,83 +160,90 @@ fun BandejaMensajesScreen(
                 .height(52.dp)
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Chips rápidos de 1 toque para priorizar chats pendientes o sin técnico
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilterChip(
+                selected = filtroRapido == FiltroMensajes.TODAS,
+                onClick = { filtroRapido = FiltroMensajes.TODAS },
+                label = { Text("Todas") }
+            )
+            FilterChip(
+                selected = filtroRapido == FiltroMensajes.ESPERANDO_RESPUESTA,
+                onClick = {
+                    filtroRapido = if (filtroRapido == FiltroMensajes.ESPERANDO_RESPUESTA) {
+                        FiltroMensajes.TODAS
+                    } else {
+                        FiltroMensajes.ESPERANDO_RESPUESTA
+                    }
+                },
+                label = { Text("Esperando respuesta") }
+            )
+            FilterChip(
+                selected = filtroRapido == FiltroMensajes.SIN_ASIGNAR,
+                onClick = {
+                    filtroRapido = if (filtroRapido == FiltroMensajes.SIN_ASIGNAR) {
+                        FiltroMensajes.TODAS
+                    } else {
+                        FiltroMensajes.SIN_ASIGNAR
+                    }
+                },
+                label = { Text("Sin asignar") }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // 3. Lista de Chats o Estado Vacío
         if (ticketsConversacion.isEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
+            EstadoVacioCard(
+                icono = Icons.Filled.Forum,
+                titulo = "Sin conversaciones activas",
+                subtitulo = if (textoFiltro.isNotEmpty()) {
+                    "No se encontraron chats que coincidan con la búsqueda."
+                } else {
+                    "Cuando abras un ticket o el equipo de soporte te responda, la conversación aparecerá aquí."
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Button(
+                    onClick = alIrACrear,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = TeamworkBlue)
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = AppleBackground,
-                        modifier = Modifier.size(64.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.Forum,
-                                contentDescription = null,
-                                tint = Color(0xFF8E8E93),
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Sin conversaciones activas",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1C1C1E)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = if (textoFiltro.isNotEmpty()) {
-                            "No se encontraron chats que coincidan con la búsqueda."
-                        } else {
-                            "Cuando abras un ticket o el equipo de soporte te responda, la conversación aparecerá aquí."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF8E8E93),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = alIrACrear,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TeamworkBlue)
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Crear nuevo ticket", fontWeight = FontWeight.Bold, color = Color.White)
-                    }
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Crear nuevo ticket", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 16.dp),
+            PullToRefreshBox(
+                isRefreshing = solicitudVm.cargando,
+                onRefresh = { solicitudVm.cargarSolicitudes(usuario) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                items(items = ticketsConversacion, key = { it.id }) { ticket ->
-                    TarjetaConversacionItem(
-                        ticket = ticket,
-                        alHacerClic = { alIrAChat(ticket.id) }
-                    )
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(items = ticketsConversacion, key = { it.id }) { ticket ->
+                        TarjetaConversacionItem(
+                            ticket = ticket,
+                            alHacerClic = { alIrAChat(ticket.id) }
+                        )
+                    }
                 }
             }
         }
@@ -223,15 +255,15 @@ private fun TarjetaConversacionItem(
     ticket: Solicitud,
     alHacerClic: () -> Unit
 ) {
-    val (estadoTexto, colorEstado, fondoEstado) = when (ticket.estado) {
-        EstadoSolicitud.RECIBIDA -> Triple("Recibida", TeamworkBlue, TeamworkBlue.copy(alpha = 0.10f))
-        EstadoSolicitud.EN_REVISION -> Triple("En revisión", Color(0xFFB54708), Color(0xFFFEF0C7))
-        EstadoSolicitud.ASIGNADA -> Triple("Asignada", Color(0xFF7A5AF8), Color(0xFFF4F3FF))
-        EstadoSolicitud.EN_PROCESO -> Triple("En proceso", Color(0xFF027A48), Color(0xFFECFDF3))
-        EstadoSolicitud.PENDIENTE_INFORMACION -> Triple("Pendiente info", Color(0xFFB54708), Color(0xFFFEF0C7))
-        EstadoSolicitud.RESUELTA -> Triple("Resuelta", Color(0xFF027A48), Color(0xFFECFDF3))
-        EstadoSolicitud.CERRADA -> Triple("Cerrada", Color(0xFF475569), Color(0xFFF1F5F9))
-        EstadoSolicitud.CANCELADA -> Triple("Cancelada", Color(0xFFD92D20), Color(0xFFFEE4E2))
+    // Reutiliza formatearEstado y tokens semánticos compartidos con las tarjetas de bandeja
+    val estadoTexto = formatearEstado(ticket.estado)
+    val (colorEstado, fondoEstado) = when (ticket.estado) {
+        EstadoSolicitud.RECIBIDA -> Pair(TeamworkBlue, TeamworkBlue.copy(alpha = 0.10f))
+        EstadoSolicitud.EN_REVISION, EstadoSolicitud.PENDIENTE_INFORMACION -> Pair(Color(0xFFB54708), Color(0xFFFEF0C7))
+        EstadoSolicitud.ASIGNADA -> Pair(Color(0xFF7A5AF8), Color(0xFFF4F3FF))
+        EstadoSolicitud.EN_PROCESO, EstadoSolicitud.RESUELTA -> Pair(SuccessGreenText, SuccessGreenBg)
+        EstadoSolicitud.CERRADA -> Pair(Color(0xFF475569), Color(0xFFF1F5F9))
+        EstadoSolicitud.CANCELADA -> Pair(AlertRedText, AlertRedBg)
     }
 
     val fechaFormateada = remember(ticket.fechaActualizacion, ticket.fechaCreacion) {

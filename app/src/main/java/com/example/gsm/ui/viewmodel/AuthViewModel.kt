@@ -1,5 +1,6 @@
 package com.example.gsm.ui.viewmodel
 
+import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,15 +9,41 @@ import androidx.lifecycle.viewModelScope
 import com.example.gsm.data.repository.UsuarioRepository
 import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Usuario
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class AuthViewModel(
-    private val usuarioRepo: UsuarioRepository
+    private val usuarioRepo: UsuarioRepository,
+    private val sessionPrefs: SharedPreferences? = null
 ) : ViewModel() {
+
+    companion object {
+        private const val KEY_ULTIMO_USUARIO_ID = "ultimo_usuario_id"
+    }
 
     // La pantalla puede leerlos, pero solo AuthViewModel puede modificarlos (private set)
     var usuarioActual by mutableStateOf<Usuario?>(null)
         private set
+
+    init {
+        // Restaura la sesión local si existe un usuario activo guardado
+        val idGuardado = sessionPrefs?.getInt(KEY_ULTIMO_USUARIO_ID, -1) ?: -1
+        if (idGuardado > 0) {
+            viewModelScope.launch {
+                val usuario = usuarioRepo.obtenerPorId(idGuardado)
+                if (usuario != null && usuario.activo) {
+                    usuarioActual = usuario
+                } else {
+                    sessionPrefs?.edit()?.remove(KEY_ULTIMO_USUARIO_ID)?.apply()
+                }
+            }
+        }
+    }
+
+    private fun guardarSesion(usuario: Usuario) {
+        usuarioActual = usuario
+        sessionPrefs?.edit()?.putInt(KEY_ULTIMO_USUARIO_ID, usuario.id)?.apply()
+    }
 
     var cargando by mutableStateOf(false)
         private set
@@ -97,7 +124,7 @@ class AuthViewModel(
 
             if (resultado.isSuccess) {
                 val user = resultado.getOrThrow()
-                usuarioActual = user
+                guardarSesion(user)
                 onExito(user)
             } else {
                 errorRegistro = resultado.exceptionOrNull()?.message ?: "Error al registrar la cuenta."
@@ -110,10 +137,12 @@ class AuthViewModel(
         val actual = usuarioActual ?: return
         viewModelScope.launch {
             usuarioRepo.actualizarPlanSuscripcion(actual.id, nuevoPlan, cuotaTickets)
-            usuarioActual = actual.copy(
-                plan = nuevoPlan,
-                ticketsDisponibles = cuotaTickets,
-                estadoSuscripcion = "ACTIVA"
+            guardarSesion(
+                actual.copy(
+                    plan = nuevoPlan,
+                    ticketsDisponibles = cuotaTickets,
+                    estadoSuscripcion = "ACTIVA"
+                )
             )
         }
     }
@@ -126,7 +155,7 @@ class AuthViewModel(
             val resultado = usuarioRepo.autenticar(correo, password)
 
             if (resultado.isSuccess) {
-                usuarioActual = resultado.getOrNull()
+                resultado.getOrNull()?.let { guardarSesion(it) }
             } else {
                 mensajeError = resultado.exceptionOrNull()?.message ?: "Credenciales incorrectas"
             }
@@ -210,7 +239,7 @@ class AuthViewModel(
 
             val resultado = usuarioRepo.completarCambioPasswordObligatorio(actual.id, passLimpia)
             if (resultado.isSuccess) {
-                usuarioActual = resultado.getOrNull()
+                resultado.getOrNull()?.let { guardarSesion(it) }
                 onExito()
             } else {
                 errorPasswordObligatoria = resultado.exceptionOrNull()?.message ?: "Error al actualizar contraseña."
@@ -224,12 +253,23 @@ class AuthViewModel(
         cambiandoPasswordObligatorio = false
     }
 
-    fun actualizarPerfil(nombre: String, telefono: String?, empresa: String?, onExito: () -> Unit = {}) {
+    fun actualizarPerfil(
+        nombre: String,
+        telefono: String?,
+        empresa: String?,
+        nuevaPassword: String? = null,
+        onExito: () -> Unit = {}
+    ) {
         val actual = usuarioActual ?: return
         val nombreLimpio = nombre.trim()
+        val passLimpia = nuevaPassword?.trim().orEmpty()
 
         if (nombreLimpio.isBlank()) {
             errorPerfil = "El nombre no puede estar vacío."
+            return
+        }
+        if (passLimpia.isNotEmpty() && passLimpia.length < 6) {
+            errorPerfil = "La nueva contraseña debe tener al menos 6 caracteres."
             return
         }
 
@@ -247,7 +287,17 @@ class AuthViewModel(
 
             val resultado = usuarioRepo.actualizarPerfil(usuarioActualizado)
             if (resultado.isSuccess) {
-                usuarioActual = usuarioActualizado
+                if (passLimpia.isNotEmpty()) {
+                    val passRes = usuarioRepo.completarCambioPasswordObligatorio(actual.id, passLimpia)
+                    if (passRes.isFailure) {
+                        errorPerfil = passRes.exceptionOrNull()?.message ?: "Error al actualizar contraseña."
+                        guardandoPerfil = false
+                        return@launch
+                    }
+                    guardarSesion(passRes.getOrNull() ?: usuarioActualizado)
+                } else {
+                    guardarSesion(usuarioActualizado)
+                }
                 mensajePerfil = "Datos actualizados exitosamente."
                 onExito()
             } else {
@@ -262,12 +312,78 @@ class AuthViewModel(
         errorPerfil = null
     }
 
+    // --- MI EMPRESA / EQUIPO (Multiusuario por Organización) ---
+    var equipoEmpresa by mutableStateOf<List<Usuario>>(emptyList())
+        private set
+
+    var mensajeEquipo by mutableStateOf<String?>(null)
+        private set
+
+    var errorEquipo by mutableStateOf<String?>(null)
+        private set
+
+    private var escuchaEquipoJob: Job? = null
+
+    fun cargarEquipoEmpresa() {
+        val empresa = usuarioActual?.empresa?.trim().orEmpty()
+        if (empresa.isBlank()) return
+        escuchaEquipoJob?.cancel()
+        escuchaEquipoJob = viewModelScope.launch {
+            launch { usuarioRepo.sincronizarEquipoDesdeNube(empresa) }
+            usuarioRepo.obtenerEquipoEmpresa(empresa).collect { lista ->
+                equipoEmpresa = lista
+            }
+        }
+    }
+
+    fun agregarColaborador(
+        nombre: String,
+        correo: String,
+        telefono: String,
+        passwordTemporal: String,
+        onExito: () -> Unit = {}
+    ) {
+        val actual = usuarioActual ?: return
+        viewModelScope.launch {
+            limpiarMensajesEquipo()
+            val res = usuarioRepo.agregarColaboradorEmpresa(nombre, correo, telefono, passwordTemporal, actual)
+            if (res.isSuccess) {
+                mensajeEquipo = "Colaborador agregado a ${actual.empresa}."
+                onExito()
+            } else {
+                errorEquipo = res.exceptionOrNull()?.message ?: "No se pudo agregar al colaborador."
+            }
+        }
+    }
+
+    fun alternarEstadoColaborador(colaboradorId: Int, activo: Boolean) {
+        val actual = usuarioActual ?: return
+        viewModelScope.launch {
+            limpiarMensajesEquipo()
+            val res = usuarioRepo.alternarEstadoColaborador(colaboradorId, activo, actual)
+            if (res.isSuccess) {
+                mensajeEquipo = if (activo) "Colaborador reactivado." else "Colaborador desactivado."
+            } else {
+                errorEquipo = res.exceptionOrNull()?.message ?: "Error al actualizar estado."
+            }
+        }
+    }
+
+    fun limpiarMensajesEquipo() {
+        mensajeEquipo = null
+        errorEquipo = null
+    }
+
     fun actualizarUsuarioEnSesion(usuario: Usuario) {
-        usuarioActual = usuario
+        guardarSesion(usuario)
     }
 
     fun cerrarSesion() {
+        escuchaEquipoJob?.cancel()
+        equipoEmpresa = emptyList()
+        limpiarMensajesEquipo()
         usuarioActual = null
+        sessionPrefs?.edit()?.remove(KEY_ULTIMO_USUARIO_ID)?.apply()
         mensajeError = null
         limpiarEstadoRecuperacion()
         limpiarEstadoPasswordObligatoria()

@@ -35,8 +35,20 @@ interface HistorialDao {
     @Query("SELECT * FROM historial WHERE solicitudId = :solicitudId ORDER BY fechaCambio DESC LIMIT 1")
     suspend fun obtenerUltimaActualizacion(solicitudId: Int): HistorialEntity?
 
-    @Query("SELECT * FROM historial ORDER BY fechaCambio DESC")
-    fun obtenerTodoHistorial(): Flow<List<HistorialEntity>>
+    // Rutas locales pendientes de subir a Appwrite (las URLs ya subidas empiezan con http)
+    @Query(
+        """
+        SELECT * FROM historial
+        WHERE evidenciaAdjunta IS NOT NULL
+          AND evidenciaAdjunta != ''
+          AND evidenciaAdjunta NOT LIKE 'http%'
+          AND evidenciaAdjunta NOT LIKE 'file:///demo%'
+        """
+    )
+    suspend fun obtenerPendientesSubida(): List<HistorialEntity>
+
+    @Query("UPDATE historial SET evidenciaAdjunta = :urlNube WHERE id = :id")
+    suspend fun actualizarEvidencia(id: Int, urlNube: String)
 
     @Query(
         """

@@ -3,7 +3,6 @@ package com.example.gsm.ui.view.screens.admin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -14,31 +13,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.gsm.data.model.RolUsuario
 import com.example.gsm.data.model.Usuario
 import com.example.gsm.data.repository.UsuarioRepository
 import com.example.gsm.ui.view.components.EncabezadoPantalla
+import com.example.gsm.ui.view.screens.admin.componentes.FilaUsuarioItem
+import com.example.gsm.ui.view.screens.admin.componentes.SheetCrearUsuario
+import com.example.gsm.ui.view.screens.admin.componentes.TarjetaConteoRol
 import com.example.gsm.ui.view.screens.usuario.componentes.AppleBackground
-import com.example.gsm.ui.view.screens.usuario.componentes.BadgePill
+import com.example.gsm.ui.view.screens.usuario.componentes.InactiveBadgeBg
+import com.example.gsm.ui.view.screens.usuario.componentes.InactiveBadgeText
+import com.example.gsm.ui.view.screens.usuario.componentes.OrangeBadgeText
+import com.example.gsm.ui.view.screens.usuario.componentes.PurpleBadgeText
 import com.example.gsm.ui.view.screens.usuario.componentes.SuccessGreenBg
 import com.example.gsm.ui.view.screens.usuario.componentes.SuccessGreenText
 import com.example.gsm.ui.view.screens.usuario.componentes.TeamworkBlue
 import com.example.gsm.ui.viewmodel.AdminDashboardViewModel
 
-private val PurpleBadgeBg = Color(0xFFF3E8FF)
-private val PurpleBadgeText = Color(0xFF7E22CE)
-private val OrangeBadgeBg = Color(0xFFFFF3E0)
-private val OrangeBadgeText = Color(0xFFE65100)
-private val InactiveBadgeBg = Color(0xFFFFEBEE)
-private val InactiveBadgeText = Color(0xFFC62828)
-
 /**
  * Pantalla dedicada exclusiva para la Gestión y Creación de Usuarios, Asignación de Roles (RBAC),
  * Suspensión/Eliminación de cuentas y Reseteo de Contraseñas.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GestionUsuariosScreen(
     admin: Usuario,
@@ -46,14 +43,6 @@ fun GestionUsuariosScreen(
     alVolver: () -> Unit
 ) {
     var mostrarDialogoCrear by remember { mutableStateOf(false) }
-
-    // Estados para nuevo usuario
-    var nombre by remember { mutableStateOf("") }
-    var correo by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf(UsuarioRepository.DEFAULT_PASSWORD) }
-    var rolSeleccionado by remember { mutableStateOf(RolUsuario.TECNICO) }
-    var empresa by remember { mutableStateOf("") }
-    var telefono by remember { mutableStateOf("") }
 
     // Diálogos de acción sobre usuarios
     var usuarioParaAlternar by remember { mutableStateOf<Usuario?>(null) }
@@ -65,9 +54,28 @@ fun GestionUsuariosScreen(
     var usuarioParaEliminar by remember { mutableStateOf<Usuario?>(null) }
     var mostrarDialogoEliminar by remember { mutableStateOf(false) }
 
+    var filtroRol by remember { mutableStateOf<RolUsuario?>(null) }
+    var textoBusqueda by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        dashboardVm.refrescarUsuariosDesdeNube()
+    }
+
     val totalClientes = dashboardVm.listaUsuarios.count { it.rol == RolUsuario.CLIENTE }
     val totalTecnicos = dashboardVm.listaUsuarios.count { it.rol == RolUsuario.TECNICO }
     val totalAdmins = dashboardVm.listaUsuarios.count { it.rol == RolUsuario.ADMINISTRADOR }
+
+    val usuariosFiltrados = remember(dashboardVm.listaUsuarios, filtroRol, textoBusqueda) {
+        val q = textoBusqueda.trim().lowercase()
+        dashboardVm.listaUsuarios.filter { u ->
+            val coincideRol = filtroRol == null || u.rol == filtroRol
+            val coincideTexto = q.isEmpty() ||
+                u.nombre.lowercase().contains(q) ||
+                u.correo.lowercase().contains(q) ||
+                u.empresa.orEmpty().lowercase().contains(q)
+            coincideRol && coincideTexto
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -84,7 +92,7 @@ fun GestionUsuariosScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 2. Tarjetas Resumen de Roles (Fila de 3 Métricas Rápidas)
+        // 2. Tarjetas Resumen de Roles (Filtros Interactivos)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -92,22 +100,28 @@ fun GestionUsuariosScreen(
             TarjetaConteoRol(
                 titulo = "Clientes",
                 conteo = totalClientes,
-                icono = "👤",
+                icono = Icons.Filled.Person,
                 color = TeamworkBlue,
+                seleccionado = filtroRol == RolUsuario.CLIENTE,
+                onClick = { filtroRol = if (filtroRol == RolUsuario.CLIENTE) null else RolUsuario.CLIENTE },
                 modifier = Modifier.weight(1f)
             )
             TarjetaConteoRol(
                 titulo = "Técnicos",
                 conteo = totalTecnicos,
-                icono = "🔧",
+                icono = Icons.Filled.Build,
                 color = OrangeBadgeText,
+                seleccionado = filtroRol == RolUsuario.TECNICO,
+                onClick = { filtroRol = if (filtroRol == RolUsuario.TECNICO) null else RolUsuario.TECNICO },
                 modifier = Modifier.weight(1f)
             )
             TarjetaConteoRol(
                 titulo = "Admins",
                 conteo = totalAdmins,
-                icono = "👔",
+                icono = Icons.Filled.AdminPanelSettings,
                 color = PurpleBadgeText,
+                seleccionado = filtroRol == RolUsuario.ADMINISTRADOR,
+                onClick = { filtroRol = if (filtroRol == RolUsuario.ADMINISTRADOR) null else RolUsuario.ADMINISTRADOR },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -174,12 +188,6 @@ fun GestionUsuariosScreen(
         // 3. Botón de Creación de Usuarios
         Button(
             onClick = {
-                nombre = ""
-                correo = ""
-                password = UsuarioRepository.DEFAULT_PASSWORD
-                rolSeleccionado = RolUsuario.TECNICO
-                empresa = ""
-                telefono = ""
                 dashboardVm.limpiarMensajesUsuario()
                 mostrarDialogoCrear = true
             },
@@ -200,7 +208,32 @@ fun GestionUsuariosScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        OutlinedTextField(
+            value = textoBusqueda,
+            onValueChange = { textoBusqueda = it },
+            placeholder = { Text("Buscar por nombre, correo o empresa...") },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = TeamworkBlue) },
+            trailingIcon = {
+                if (textoBusqueda.isNotEmpty()) {
+                    IconButton(onClick = { textoBusqueda = "" }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Limpiar búsqueda")
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = TeamworkBlue,
+                unfocusedBorderColor = Color(0xFFE5E5EA)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         // 4. Listado de Cuentas (Inset Grouped)
         Surface(
@@ -210,24 +243,24 @@ fun GestionUsuariosScreen(
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = "Usuarios Registrados (${dashboardVm.listaUsuarios.size})",
+                    text = "Usuarios Registrados (${usuariosFiltrados.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
 
                 HorizontalDivider(color = AppleBackground)
 
-                if (dashboardVm.listaUsuarios.isEmpty()) {
+                if (usuariosFiltrados.isEmpty()) {
                     Text(
-                        text = "No hay usuarios registrados.",
+                        text = if (filtroRol != null || textoBusqueda.isNotBlank()) "Sin usuarios que coincidan con el filtro." else "No hay usuarios registrados.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    dashboardVm.listaUsuarios.forEachIndexed { index, itemUsuario ->
+                    usuariosFiltrados.forEachIndexed { index, itemUsuario ->
                         FilaUsuarioItem(
                             usuario = itemUsuario,
                             adminActual = admin,
@@ -244,7 +277,7 @@ fun GestionUsuariosScreen(
                                 mostrarDialogoEliminar = true
                             }
                         )
-                        if (index < dashboardVm.listaUsuarios.size - 1) {
+                        if (index < usuariosFiltrados.lastIndex) {
                             HorizontalDivider(color = AppleBackground)
                         }
                     }
@@ -255,151 +288,25 @@ fun GestionUsuariosScreen(
         Spacer(modifier = Modifier.height(20.dp))
     }
 
-    // Modal de Registro de Usuario y Rol RBAC
+    // Sheet inferior para Registro de Usuario (extraído a GestionUsuariosComponentes)
     if (mostrarDialogoCrear) {
-        AlertDialog(
-            onDismissRequest = {
-                mostrarDialogoCrear = false
-                dashboardVm.limpiarMensajesUsuario()
-            },
-            shape = RoundedCornerShape(18.dp),
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = "👑 Crear Nueva Cuenta",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+        SheetCrearUsuario(
+            creandoUsuario = dashboardVm.creandoUsuario,
+            errorUsuario = dashboardVm.errorUsuario,
+            onRegistrar = { nom, corr, pass, rolSel, emp, tel ->
+                dashboardVm.crearUsuario(
+                    nombre = nom,
+                    correo = corr,
+                    password = pass,
+                    rol = rolSel,
+                    empresa = emp,
+                    telefono = tel,
+                    onExito = { mostrarDialogoCrear = false }
                 )
             },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Asigna un rol y credenciales al nuevo integrante del sistema.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    OutlinedTextField(
-                        value = nombre,
-                        onValueChange = { nombre = it },
-                        label = { Text("Nombre completo *") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = correo,
-                        onValueChange = { correo = it },
-                        label = { Text("Correo electrónico *") },
-                        placeholder = { Text("usuario@gsm.cl") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Contraseña inicial *") },
-                        supportingText = { Text("Por defecto: ${UsuarioRepository.DEFAULT_PASSWORD}. Se obligará a renovarla.") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Text(
-                        text = "Rol asignado (Control de Acceso RBAC):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        FilterChip(
-                            selected = rolSeleccionado == RolUsuario.CLIENTE,
-                            onClick = { rolSeleccionado = RolUsuario.CLIENTE },
-                            label = { Text("👤 Cliente", style = MaterialTheme.typography.labelSmall) }
-                        )
-                        FilterChip(
-                            selected = rolSeleccionado == RolUsuario.TECNICO,
-                            onClick = { rolSeleccionado = RolUsuario.TECNICO },
-                            label = { Text("🔧 Técnico", style = MaterialTheme.typography.labelSmall) }
-                        )
-                        FilterChip(
-                            selected = rolSeleccionado == RolUsuario.ADMINISTRADOR,
-                            onClick = { rolSeleccionado = RolUsuario.ADMINISTRADOR },
-                            label = { Text("👑 Admin", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = empresa,
-                        onValueChange = { empresa = it },
-                        label = { Text(if (rolSeleccionado == RolUsuario.CLIENTE) "Empresa solicitante" else "Organización") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = telefono,
-                        onValueChange = { telefono = it },
-                        label = { Text("Teléfono de contacto") },
-                        placeholder = { Text("+56 9 1234 5678") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (dashboardVm.errorUsuario != null) {
-                        Text(
-                            text = dashboardVm.errorUsuario ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        dashboardVm.crearUsuario(
-                            nombre = nombre,
-                            correo = correo,
-                            password = password,
-                            rol = rolSeleccionado,
-                            empresa = empresa,
-                            telefono = telefono,
-                            onExito = {
-                                mostrarDialogoCrear = false
-                            }
-                        )
-                    },
-                    enabled = !dashboardVm.creandoUsuario,
-                    colors = ButtonDefaults.buttonColors(containerColor = TeamworkBlue)
-                ) {
-                    Text(if (dashboardVm.creandoUsuario) "Creando..." else "Registrar")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        mostrarDialogoCrear = false
-                        dashboardVm.limpiarMensajesUsuario()
-                    }
-                ) {
-                    Text("Cancelar")
-                }
+            onDismiss = {
+                mostrarDialogoCrear = false
+                dashboardVm.limpiarMensajesUsuario()
             }
         )
     }
@@ -577,209 +484,5 @@ fun GestionUsuariosScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun TarjetaConteoRol(
-    titulo: String,
-    conteo: Int,
-    icono: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White,
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(text = icono, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = conteo.toString(),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = color
-            )
-            Text(
-                text = titulo,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun FilaUsuarioItem(
-    usuario: Usuario,
-    adminActual: Usuario,
-    onAlternarActivo: () -> Unit,
-    onResetearPassword: () -> Unit,
-    onEliminar: () -> Unit
-) {
-    val (icono, fondoRol, textoRol) = when (usuario.rol) {
-        RolUsuario.CLIENTE -> Triple("👤", Color(0xFFE3F2FD), TeamworkBlue)
-        RolUsuario.TECNICO -> Triple("🔧", OrangeBadgeBg, OrangeBadgeText)
-        RolUsuario.ADMINISTRADOR -> Triple("👔", PurpleBadgeBg, PurpleBadgeText)
-    }
-
-    val esUsuarioPropio = usuario.id == adminActual.id
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = AppleBackground,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(text = icono, style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = usuario.nombre,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (esUsuarioPropio) {
-                            BadgePill(
-                                texto = "Tú",
-                                colorFondo = Color(0xFFE0E0E0),
-                                colorTexto = Color(0xFF424242)
-                            )
-                        }
-                    }
-                    Text(
-                        text = usuario.correo,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (!usuario.empresa.isNullOrBlank() || !usuario.telefono.isNullOrBlank()) {
-                        val detalle = listOfNotNull(
-                            usuario.empresa?.let { "🏢 $it" },
-                            usuario.telefono?.let { "📞 $it" }
-                        ).joinToString(" • ")
-                        Text(
-                            text = detalle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Badges de Rol y Estado
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BadgePill(
-                    texto = usuario.rol.name,
-                    colorFondo = fondoRol,
-                    colorTexto = textoRol
-                )
-
-                if (usuario.activo) {
-                    BadgePill(
-                        texto = "Activo",
-                        colorFondo = SuccessGreenBg,
-                        colorTexto = SuccessGreenText
-                    )
-                } else {
-                    BadgePill(
-                        texto = "Inactivo",
-                        colorFondo = InactiveBadgeBg,
-                        colorTexto = InactiveBadgeText
-                    )
-                }
-            }
-        }
-
-        // Fila de Acciones Rápidas (Reset clave, Pausar/Activar, Eliminar)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 50.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 1. Resetear Contraseña (GSMPass12345)
-            FilledTonalButton(
-                onClick = onResetearPassword,
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = AppleBackground,
-                    contentColor = TeamworkBlue
-                )
-            ) {
-                Icon(Icons.Filled.LockReset, contentDescription = null, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Reset Clave", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-
-            if (!esUsuarioPropio) {
-                // 2. Alternar Estado (Desactivar / Reactivar)
-                FilledTonalButton(
-                    onClick = onAlternarActivo,
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (usuario.activo) InactiveBadgeBg else SuccessGreenBg,
-                        contentColor = if (usuario.activo) InactiveBadgeText else SuccessGreenText
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (usuario.activo) Icons.Filled.Block else Icons.Filled.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (usuario.activo) "Desactivar" else "Reactivar",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // 3. Eliminar Usuario
-                IconButton(
-                    onClick = onEliminar,
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.DeleteOutline,
-                        contentDescription = "Eliminar cuenta",
-                        tint = InactiveBadgeText,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
     }
 }

@@ -20,7 +20,13 @@ build/
 */build/
 /build
 app/build/
+app/release/
+app/debug/
+**/release/
+**/debug/
+output-metadata.json
 *.apk
+*.apks
 *.aab
 
 # ====================================================================
@@ -33,6 +39,9 @@ GoogleService-Info.plist
 */GoogleService-Info.plist
 
 # Keystores y Certificados de Firma
+keyProduccion/
+**/keyProduccion/
+**/keyProd
 *.jks
 *.keystore
 *.key
@@ -40,6 +49,9 @@ GoogleService-Info.plist
 *.p12
 *.pem
 *.pk8
+*.pfx
+*.cer
+*.crt
 
 # Secretos Locales y Variables de Entorno
 secrets.properties
@@ -66,10 +78,19 @@ skills-lock.json
 *.db-journal
 
 # ====================================================================
-# Web App (Next.js / Node)
+# Web App (Next.js / Node) & Firebase Functions
 # ====================================================================
 web/node_modules/
 web/.next/
 web/.env*
 web/out/
 web/build/
+node_modules/
+functions/node_modules/
+functions/.env*
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+*.bak
+*.tmp

@@ -80,8 +80,24 @@ class SolicitudLocalRepository(
         }
     }
 
-    suspend fun actualizarInformacion(id: Int, nuevoTitulo: String, nuevaDescripcion: String, ahora: Long) {
-        solicitudDao.actualizarInformacion(id, nuevoTitulo, nuevaDescripcion, ahora)
+    suspend fun actualizarInformacion(
+        id: Int,
+        nuevoTitulo: String,
+        nuevaDescripcion: String,
+        categoria: CategoriaSolicitud,
+        servicioRelacionado: String?,
+        activoRelacionado: String?,
+        ahora: Long
+    ) {
+        solicitudDao.actualizarInformacion(
+            solicitudId = id,
+            titulo = nuevoTitulo,
+            descripcion = nuevaDescripcion,
+            categoria = categoria.name,
+            servicio = servicioRelacionado,
+            activo = activoRelacionado,
+            ts = ahora
+        )
     }
 
     suspend fun insertar(solicitud: Solicitud, esBorrador: Boolean = false): Long {
@@ -158,8 +174,8 @@ class SolicitudLocalRepository(
         solicitudDao.registrarResolucion(id, resolucion, ahora)
     }
 
-    suspend fun confirmarCierre(id: Int, conforme: Boolean, ahora: Long) {
-        solicitudDao.confirmarCierre(id, conforme, ahora)
+    suspend fun confirmarCierre(id: Int, conforme: Boolean, ahora: Long, calificacion: Int? = null) {
+        solicitudDao.confirmarCierre(id, conforme, calificacion, ahora)
     }
 
     suspend fun solicitarReapertura(id: Int, motivo: String, ahora: Long) {
@@ -182,6 +198,9 @@ class SolicitudLocalRepository(
 
     fun contarPorTecnico(): Flow<List<ConteoPorTecnicoDto>> =
         solicitudDao.contarSolicitudesPorTecnico()
+
+    fun promedioCalificacion(): Flow<Double?> =
+        solicitudDao.promedioCalificacion()
 
     // --- Funciones de utilidad interna ---
     fun generarCodigoUnico(): String {

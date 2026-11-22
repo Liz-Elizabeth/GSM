@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">GSM</string>
+    <string name="nav_bandeja">Bandeja</string>
+    <string name="nav_mensajes">Mensajes</string>
+    <string name="nav_nuevo">Nuevo</string>
+    <string name="nav_pases_qr">Pases QR</string>
+    <string name="nav_perfil">Perfil</string>
+    <string name="aviso_sin_conexion">Sin conexión · tus cambios se sincronizarán al volver</string>
+    <string name="accion_guardar">Guardar</string>
+    <string name="accion_cancelar">Cancelar</string>
+    <string name="accion_volver">Volver</string>
+    <string name="accion_cerrar_sesion">Cerrar Sesión</string>
 </resources>
